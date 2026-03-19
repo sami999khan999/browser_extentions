@@ -1,0 +1,155 @@
+/* === Settings View === */
+
+.settings-title {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: var(--stats-text-primary) !important;
+    margin-bottom: 24px !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+}
+
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.settings-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: var(--stats-card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--stats-border);
+}
+
+.settings-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.settings-item-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--stats-text-primary);
+}
+
+.settings-item-desc {
+    font-size: 12px;
+    color: var(--stats-text-secondary);
+    line-height: 1.4;
+}
+
+.settings-text-input {
+    background: var(--stats-sidebar-bg);
+    border: 1px solid var(--stats-border);
+    color: var(--stats-text-primary);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    width: 100%;
+    max-width: 200px;
+    box-sizing: border-box;
+    transition: all 0.2s;
+}
+
+.settings-text-input:focus {
+    outline: none;
+    border-color: #ff0000;
+    box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.1);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--stats-border);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: #ff0000;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* Interval Stepper */
+.interval-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.interval-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--stats-border);
+    background: var(--stats-card-bg);
+    color: var(--stats-text-primary);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.interval-btn:hover {
+    background: var(--stats-border);
+}
+
+.interval-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--stats-text-primary);
+    min-width: 28px;
+    text-align: center;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.interval-unit {
+    font-size: 12px;
+    color: var(--stats-text-secondary);
+    font-weight: 500;
+}
