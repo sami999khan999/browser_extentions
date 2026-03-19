@@ -2,8 +2,6 @@
 
 A professional Chrome extension designed to help you take control of your YouTube viewing habits. It monitors your watch time, blocks distractions, and encourages productive breaks.
 
-![Action-Dashboard](icons/icon128.jpg)
-
 ## 🚀 Key Features
 
 ### 1. Advanced Shorts Blocker
