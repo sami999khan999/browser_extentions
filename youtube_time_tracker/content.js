@@ -1,0 +1,1219 @@
+// 7-Day Stats State Persistence (localStorage)
+function getDayKey(date = new Date()) {
+    return date.toISOString().split('T')[0];
+}
+
+function loadHistory() {
+    try {
+        const data = localStorage.getItem('yt_shorts_blocker_history');
+        const history = data ? JSON.parse(data) : {};
+        
+        // Cleanup: Remove keys older than 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const threshold = getDayKey(sevenDaysAgo);
+        
+        const cleanedHistory = {};
+        Object.keys(history).forEach(key => {
+            if (key >= threshold) cleanedHistory[key] = history[key];
+        });
+        
+        return cleanedHistory;
+    } catch (e) { 
+        console.error('Failed to load history:', e); 
+        return {};
+    }
+}
+
+function saveHistory() {
+    try {
+        localStorage.setItem('yt_shorts_blocker_history', JSON.stringify(allHistory));
+    } catch (e) { console.error('Failed to save history:', e); }
+}
+
+// Global State
+let allHistory = loadHistory();
+const todayKey = getDayKey();
+if (!allHistory[todayKey]) {
+    allHistory[todayKey] = { watchTime: 0, videos: [], sessionStart: Date.now() };
+}
+
+let selectedDayFilter = 'today'; // 'today', 'yesterday', 'all', or 'YYYY-MM-DD'
+let activeView = 'history'; // 'history', 'analytics', or 'settings'
+let lastVideoId = '';
+let lastWatchTimeUpdate = Date.now();
+let isStatsOpen = false;
+let lastRenderedView = '';
+let lastRenderedFilter = '';
+let lastVideoCount = -1;
+
+// Shorts Blocker State
+function loadShortsBlockerSettings() {
+    try {
+        const data = localStorage.getItem('yt_shorts_blocker_settings');
+        return data ? JSON.parse(data) : { enabled: true };
+    } catch (e) { return { enabled: true }; }
+}
+function saveShortsBlockerSettings() {
+    localStorage.setItem('yt_shorts_blocker_settings', JSON.stringify(shortsBlockerSettings));
+}
+let shortsBlockerSettings = loadShortsBlockerSettings();
+
+const SHORTS_BLOCKER_CSS_ID = 'yt-shorts-blocker-dynamic-css';
+const SHORTS_BLOCKER_CSS = `
+/* Hiding Shorts Sidebar Entries */
+ytd-guide-entry-renderer:has(a[href="/shorts"]),
+ytd-mini-guide-entry-renderer:has(a[href="/shorts"]),
+ytd-guide-entry-renderer:has(a[title="Shorts"]),
+ytd-mini-guide-entry-renderer:has(a[title="Shorts"]) {
+    display: none !important;
+}
+/* Hiding Home Feed Shorts Sections */
+ytd-rich-shelf-renderer[is-shorts],
+ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+ytd-reel-shelf-renderer {
+    display: none !important;
+}
+/* Hiding Shorts in Search Results */
+ytd-reel-shelf-renderer,
+ytd-shelf-renderer:has(ytd-reel-shelf-renderer) {
+    display: none !important;
+}
+/* Hiding individual Shorts videos */
+ytd-video-renderer:has(a[href^="/shorts"]),
+ytd-grid-video-renderer:has(a[href^="/shorts"]),
+ytd-rich-item-renderer:has(a[href^="/shorts"]) {
+    display: none !important;
+}
+/* Hiding Shorts Section in Navigation Drawer */
+ytd-guide-section-renderer:has(a[href="/shorts"]),
+ytd-guide-entry-renderer:has(a[href="/shorts"]) {
+    display: none !important;
+}
+/* Hiding Shorts Tab on Channel Pages */
+yt-tab-shape[tab-title="Shorts"],
+.yt-tab-shape-wiz__tab[aria-label="Shorts"],
+a[href$="/shorts"] {
+    display: none !important;
+}
+/* Specific fix for sidebar links that might have escaped */
+ytd-guide-entry-renderer a[href="/shorts"],
+ytd-mini-guide-entry-renderer a[href="/shorts"] {
+    display: none !important;
+}
+`;
+
+function injectShortsBlockerCSS() {
+    if (!document.getElementById(SHORTS_BLOCKER_CSS_ID)) {
+        const style = document.createElement('style');
+        style.id = SHORTS_BLOCKER_CSS_ID;
+        style.textContent = SHORTS_BLOCKER_CSS;
+        (document.head || document.documentElement).appendChild(style);
+    }
+}
+
+function removeShortsBlockerCSS() {
+    const el = document.getElementById(SHORTS_BLOCKER_CSS_ID);
+    if (el) el.remove();
+}
+
+function applyShortsBlockerState() {
+    if (shortsBlockerSettings.enabled) {
+        injectShortsBlockerCSS();
+        blockShorts();
+    } else {
+        removeShortsBlockerCSS();
+        removeMockingScreen();
+        // Un-hide any JS-hidden shorts tabs
+        unhideShortsTabs();
+    }
+}
+
+function unhideShortsTabs() {
+    const selectors = ['yt-tab-shape', 'tp-yt-paper-tab', '.yt-tab-shape-wiz__tab', 'yt-chip-cloud-chip-renderer'];
+    selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+            const text = el.textContent.trim().toLowerCase();
+            const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+            const title = (el.getAttribute('tab-title') || '').toLowerCase();
+            if (text === 'shorts' || aria === 'shorts' || title === 'shorts') {
+                el.style.removeProperty('display');
+            }
+        });
+    });
+}
+
+// Break Reminder State
+function loadBreakSettings() {
+    try {
+        const data = localStorage.getItem('yt_break_reminder_settings');
+        return data ? JSON.parse(data) : { 
+            enabled: true, 
+            intervalMinutes: 15,
+            workUrl: 'https://www.google.com'
+        };
+    } catch (e) { return { enabled: true, intervalMinutes: 15, workUrl: 'https://www.google.com' }; }
+}
+function saveBreakSettings() {
+    localStorage.setItem('yt_break_reminder_settings', JSON.stringify(breakSettings));
+}
+let breakSettings = loadBreakSettings();
+
+let continuousWatchStart = null;
+let breakModalShown = false;
+let preFetchedQuote = null;
+let isFetchingQuote = false;
+
+
+
+
+const dayColors = [
+    '#ff4e4e', // Today (Red)
+    '#ff8a00', // -1
+    '#ffc700', // -2
+    '#00e000', // -3
+    '#00c2ff', // -4
+    '#7000ff', // -5
+    '#ff00c7'  // -6
+];
+
+const icons = {
+    analytics: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`,
+    history: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+    close: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+    delete: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+    stats_toggle: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"></path><path d="M18 20V4"></path><path d="M6 20v-4"></path></svg>`,
+    settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+};
+
+
+
+
+
+
+
+
+
+function blockShorts() {
+
+    // Hide channel tabs using JS (more reliable than CSS for text matching)
+    hideShortsTabs();
+    
+    // Reorder sidebar as requested
+    reorderSidebar();
+
+    // Check if we are on a shorts page
+    if (window.location.pathname.startsWith('/shorts/')) {
+        injectMockingScreen();
+    } else {
+        removeMockingScreen();
+    }
+}
+
+function reorderSidebar() {
+    // Find the sections by targeting the links they contain
+    // "Subscriptions" corresponds to /feed/subscriptions
+    // "You" corresponds to /feed/you or /feed/library
+    const subLink = document.querySelector('a[href="/feed/subscriptions"]');
+    const youLink = document.querySelector('a[href="/feed/you"], a[href="/feed/library"]');
+
+    if (subLink && youLink) {
+        const subSection = subLink.closest('ytd-guide-section-renderer');
+        const youSection = youLink.closest('ytd-guide-section-renderer');
+
+        if (subSection && youSection && subSection.parentNode === youSection.parentNode) {
+            const parent = subSection.parentNode;
+            // Check if youSection is after subSection in the DOM
+            if (subSection.compareDocumentPosition(youSection) & Node.DOCUMENT_POSITION_FOLLOWING) {
+                // Move youSection before subSection
+                parent.insertBefore(youSection, subSection);
+            }
+        }
+    }
+}
+
+
+
+
+function hideShortsTabs() {
+    const selectors = ['yt-tab-shape', 'tp-yt-paper-tab', '.yt-tab-shape-wiz__tab', 'yt-chip-cloud-chip-renderer'];
+    selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+            const text = el.textContent.trim().toLowerCase();
+            const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+            const title = (el.getAttribute('tab-title') || '').toLowerCase();
+            
+            if (text === 'shorts' || aria === 'shorts' || title === 'shorts' || (el.querySelector && el.querySelector('a[href*="/shorts"]'))) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+        });
+    });
+
+    // Also hide any link that goes to shorts directly
+    const links = document.querySelectorAll('a[href*="/shorts"]');
+    links.forEach(link => {
+        // If it's a tab link, hide the parent/containier if needed, but mostly the link itself
+        if (link.classList.contains('yt-tab-shape-wiz__tab') || link.closest('tp-yt-paper-tab')) {
+             const tab = link.closest('yt-tab-shape') || link.closest('tp-yt-paper-tab') || link;
+             tab.style.setProperty('display', 'none', 'important');
+        }
+    });
+}
+
+
+function removeMockingScreen() {
+    const overlay = document.getElementById('shorts-blocker-overlay');
+    if (overlay) {
+        // Clear the playback killer interval
+        const intervalId = overlay.dataset.playbackIntervalId;
+        if (intervalId) {
+            clearInterval(Number(intervalId));
+        }
+        overlay.remove();
+    }
+}
+
+
+function injectMockingScreen() {
+    if (document.getElementById('shorts-blocker-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'shorts-blocker-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #0f0f0f;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 2147483647;
+        font-family: 'Roboto', Arial, sans-serif;
+        text-align: center;
+        padding: 20px;
+    `;
+
+    overlay.innerHTML = `
+        <div style="margin-bottom: 24px; animation: bounce 1.5s infinite ease-in-out;">
+            <!-- Realistic YouTube Logo -->
+            <svg version="1.1" id="YouTube_Logo" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	             viewBox="0 0 1024 721" enable-background="new 0 0 1024 721" xml:space="preserve" style="width: 120px; height: auto;">
+                <path fill="#FF0000" d="M1013,156.3c-11.9-44.7-47.1-79.8-91.8-91.7C841,40,512,40,512,40S183,40,102.8,64.6
+                    C58.1,76.5,22.9,111.6,11,156.3C-13.3,236.8-13.3,404-13.3,404s0,167.2,24.3,247.7c11.9,44.7,47.1,79.8,91.8,91.7
+                    C183,768,512,768,512,768s329,0,409.2-24.6c44.7-11.9,79.9-47,91.8-91.7C1037.3,571.2,1037.3,404,1037.3,404S1037.3,236.8,1013,156.3z"/>
+                <polygon fill="#FFFFFF" points="408,528 674,404 408,280"/>
+            </svg>
+        </div>
+        <h1 style="font-size: 56px; font-weight: 900; margin-bottom: 16px; text-transform: uppercase; color: #ff0000; letter-spacing: -2px; text-shadow: 0 0 30px rgba(255, 0, 0, 0.4);">SHORTS BLOCKED</h1>
+        <p style="font-size: 26px; color: #ffffff; max-width: 700px; line-height: 1.3; margin-bottom: 48px; font-weight: 500;">
+            Wait... were you really trying to watch <span style="color:#ff0000; font-weight: 800;">Shorts</span>? <br>
+            <span style="font-size: 19px; color: #aaaaaa; font-weight: 400; display: block; margin-top: 10px;">Your attention span is at stake! Go do something productive.</span>
+        </p>
+        <button id="go-back-btn" style="
+            background-color: #ff0000;
+            color: #ffffff;
+            border: none;
+            padding: 16px 40px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 20px rgba(255, 0, 0, 0.3);
+            text-transform: uppercase;
+        ">Back to Civilization</button>
+        <style>
+            @keyframes bounce {
+                0%, 100% { transform: translateY(0) scale(1.05); }
+                50% { transform: translateY(-20px) scale(0.95); }
+            }
+            #go-back-btn:hover {
+                background-color: #cc0000;
+                transform: scale(1.1) translateY(-5px);
+                box-shadow: 0 15px 30px rgba(255, 0, 0, 0.5);
+            }
+            #go-back-btn:active {
+                transform: scale(0.98) translateY(0);
+            }
+        </style>
+    `;
+
+    document.documentElement.appendChild(overlay);
+
+    document.getElementById('go-back-btn').onclick = () => {
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.href = 'https://www.youtube.com';
+        }
+    };
+
+    // Kill all video/audio playback immediately and continuously
+    const killPlayback = () => {
+        const media = document.querySelectorAll('video, audio');
+        media.forEach(m => {
+            m.pause();
+            m.muted = true;
+            m.volume = 0;
+            m.currentTime = 0;
+            m.style.display = 'none';
+        });
+    };
+    
+    killPlayback();
+    // Keep killing playback to prevent auto-play or next-video triggers
+    const playbackInterval = setInterval(killPlayback, 100);
+    
+    // Store interval to clean up later if needed
+    overlay.dataset.playbackIntervalId = playbackInterval;
+}
+
+
+function updateStats() {
+    const now = Date.now();
+    const delta = (now - lastWatchTimeUpdate) / 1000;
+    lastWatchTimeUpdate = now;
+
+    const watchFlexy = document.querySelector('ytd-watch-flexy');
+    let videoId = watchFlexy ? watchFlexy.getAttribute('video-id') : new URLSearchParams(window.location.search).get('v');
+    
+    const video = document.querySelector('video.video-stream.html5-main-video') || document.querySelector('video');
+    
+    // Ensure we have a bucket for today (in case the date rolled over while tab was open)
+    const currentDay = getDayKey();
+    if (!allHistory[currentDay]) {
+        allHistory[currentDay] = { watchTime: 0, videos: [], sessionStart: now };
+    }
+    const todayData = allHistory[currentDay];
+
+    if (videoId) {
+        if (videoId !== lastVideoId) {
+            lastVideoId = videoId;
+            const videoTitleEl = document.querySelector('h1.ytd-watch-metadata') || 
+                                 document.querySelector('.ytd-video-primary-info-renderer h1.title') ||
+                                 document.querySelector('h1.title.ytd-video-primary-info-renderer');
+            const title = videoTitleEl ? videoTitleEl.textContent.trim() : 'Loading Video...';
+            
+            if (!todayData.videos.find(v => v.id === videoId)) {
+                todayData.videos.push({
+                    id: videoId,
+                    title: title,
+                    thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                    startTime: new Date().toLocaleTimeString(),
+                    watchedDuration: 0,
+                    totalDuration: (video && isFinite(video.duration) && video.duration > 0) ? video.duration : 0
+                });
+            }
+        }
+
+        const activeVideo = todayData.videos.find(v => v.id === videoId);
+        if (activeVideo && video) {
+            if (activeVideo.title === 'Loading Video...') {
+                 const videoTitleEl = document.querySelector('h1.ytd-watch-metadata') || 
+                                      document.querySelector('.ytd-video-primary-info-renderer h1.title');
+                 if (videoTitleEl) activeVideo.title = videoTitleEl.textContent.trim();
+            }
+
+            if ((!activeVideo.totalDuration || activeVideo.totalDuration === 0) && isFinite(video.duration) && video.duration > 0) {
+                 activeVideo.totalDuration = video.duration;
+            }
+            if (!video.paused && !video.ended && video.readyState >= 2) {
+                activeVideo.watchedDuration += delta;
+                todayData.watchTime += delta;
+            }
+        }
+    }
+
+    if (isStatsOpen) {
+        renderStats();
+    }
+    
+    saveHistory();
+}
+
+
+
+
+function injectStatsUI() {
+    if (!document.body) return;
+    if (document.getElementById('stats-toggle-btn')) return;
+
+    // Toggle Button
+    const btn = document.createElement('div');
+    btn.id = 'stats-toggle-btn';
+    btn.innerHTML = icons.stats_toggle;
+    btn.title = 'YouTube Stats Tracker (Drag to Move)';
+    
+    // Position Persistence
+    const savedPos = localStorage.getItem('yt_stats_btn_pos');
+    if (savedPos) {
+        const { top, left } = JSON.parse(savedPos);
+        btn.style.top = top;
+        btn.style.left = left;
+        btn.style.bottom = 'auto';
+        btn.style.right = 'auto';
+    }
+    
+    document.body.appendChild(btn);
+
+    // Draggable Logic
+    let isDragging = false;
+    let startX, startY, btnStartX, btnStartY;
+
+    btn.onmousedown = (e) => {
+        isDragging = false;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = btn.getBoundingClientRect();
+        btnStartX = rect.left;
+        btnStartY = rect.top;
+
+        const onMouseMove = (moveEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+            
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                isDragging = true;
+                btn.classList.add('dragging');
+                
+                let newLeft = btnStartX + dx;
+                let newTop = btnStartY + dy;
+                
+                // Boundary Constraints
+                const padding = 10;
+                newLeft = Math.max(padding, Math.min(window.innerWidth - btn.offsetWidth - padding, newLeft));
+                newTop = Math.max(padding, Math.min(window.innerHeight - btn.offsetHeight - padding, newTop));
+                
+                btn.style.left = newLeft + 'px';
+                btn.style.top = newTop + 'px';
+                btn.style.bottom = 'auto';
+                btn.style.right = 'auto';
+            }
+        };
+
+        const onMouseUp = () => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            
+            if (isDragging) {
+                btn.classList.remove('dragging');
+                
+                // Springy Edge Snapping with Scrollbar Awareness
+                const rect = btn.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const padding = 10;
+                const scrollbarPadding = 30; // Extra room for YouTube scrollbar
+                
+                if (centerX < window.innerWidth / 2) {
+                    btn.style.left = padding + 'px';
+                } else {
+                    btn.style.left = (window.innerWidth - rect.width - scrollbarPadding) + 'px';
+                }
+                
+                // Save state
+                setTimeout(() => {
+                    localStorage.setItem('yt_stats_btn_pos', JSON.stringify({
+                        top: btn.style.top,
+                        left: btn.style.left
+                    }));
+                }, 300);
+            }
+        };
+
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+
+
+
+    // Sidebar
+    const sidebar = document.createElement('div');
+    sidebar.id = 'stats-sidebar';
+
+    // Load and Apply Persisted Width
+    const savedWidth = localStorage.getItem('yt_stats_sidebar_width');
+    if (savedWidth) {
+        sidebar.style.width = savedWidth + 'px';
+    }
+
+    // Add Resizer Handle
+    const resizer = document.createElement('div');
+    resizer.className = 'sidebar-resizer';
+    sidebar.appendChild(resizer);
+
+    // Resizing Logic
+    let isResizing = false;
+    resizer.onmousedown = (e) => {
+        e.preventDefault(); // Prevent text selection start
+        isResizing = true;
+        document.body.classList.add('yt-shorts-resizing-active');
+        sidebar.classList.add('resizing');
+        resizer.classList.add('active');
+        
+        const startX = e.clientX;
+        const startWidth = parseInt(getComputedStyle(sidebar).width, 10);
+
+        const onMouseMove = (moveEvent) => {
+            if (!isResizing) return;
+            const currentX = moveEvent.clientX;
+            const delta = startX - currentX; // Moving left increases width
+            let newWidth = startWidth + delta;
+            
+            // Constraints
+            newWidth = Math.max(300, Math.min(800, newWidth));
+            sidebar.style.width = newWidth + 'px';
+        };
+
+        const onMouseUp = () => {
+            isResizing = false;
+            document.body.classList.remove('yt-shorts-resizing-active');
+            sidebar.classList.remove('resizing');
+            resizer.classList.remove('active');
+            localStorage.setItem('yt_stats_sidebar_width', parseInt(sidebar.style.width, 10));
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+
+
+    sidebar.insertAdjacentHTML('beforeend', `
+        <div class="stats-header">
+            <div class="header-top">
+                <h2>Stats Tracker</h2>
+                <div class="header-actions">
+                    <button id="nav-history" title="Watch History" class="active">${icons.history}</button>
+                    <button id="nav-analytics" title="Analytics Trends">${icons.analytics}</button>
+                    <button id="nav-settings" title="Settings">${icons.settings}</button>
+                    <button id="close-stats">${icons.close}</button>
+                </div>
+            </div>
+            <div id="history-header-filters">
+                <div class="filter-chips">
+                    <button class="filter-chip active" data-filter="today">Today</button>
+                    <button class="filter-chip" data-filter="yesterday">Yesterday</button>
+                    <button class="filter-chip" data-filter="all">Last 7 Days</button>
+                </div>
+            </div>
+        </div>
+        <div class="stats-body">
+            <div id="history-view">
+                <div class="stats-dashboard">
+                    <div class="stat-card">
+                        <span class="stat-label">Time on YouTube</span>
+                        <span id="session-duration">00:00:00</span>
+                    </div>
+                    <div class="stat-card accent">
+                        <span class="stat-label">Video Watch Time</span>
+                        <span id="total-watch-time">00:00:00</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Videos Watched</span>
+                        <span id="videos-count">0</span>
+                    </div>
+                </div>
+                <div class="video-list-container">
+                    <h3 id="history-title">Watch History (Today)</h3>
+                    <ul id="video-history-list"></ul>
+                </div>
+            </div>
+            <div id="analytics-view" style="display: none;">
+                <div class="analytics-section">
+                    <h3>7-Day Watch Time Trends</h3>
+                    <div id="stats-chart"></div>
+                </div>
+                <div class="analytics-section">
+                    <h3>Weekly Distribution</h3>
+                    <div class="pie-chart-container">
+                        <div id="pie-chart"></div>
+                        <div id="pie-legend"></div>
+                    </div>
+                </div>
+                <div id="key-insights"></div>
+            </div>
+            <div id="settings-view" style="display: none;">
+                <h3 class="settings-title">Settings</h3>
+                <div class="settings-group">
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <span class="settings-item-label">Shorts Blocker</span>
+                            <span class="settings-item-desc">Hide all YouTube Shorts from feeds, search, sidebar & block Shorts pages</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="shorts-blocker-toggle" ${shortsBlockerSettings.enabled ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <span class="settings-item-label">Break Reminder</span>
+                            <span class="settings-item-desc">Pause video & show a motivational quote after continuous watching</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="break-enabled-toggle" ${breakSettings.enabled ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <span class="settings-item-label">Reminder Interval</span>
+                            <span class="settings-item-desc">Minutes of continuous watching before a break</span>
+                        </div>
+                        <div class="interval-input-wrapper">
+                            <button class="interval-btn minus" id="interval-minus">−</button>
+                            <span id="interval-value" class="interval-value">${breakSettings.intervalMinutes}</span>
+                            <button class="interval-btn plus" id="interval-plus">+</button>
+                            <span class="interval-unit">min</span>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <span class="settings-item-label">Work/Home URL</span>
+                            <span class="settings-item-desc">Where the "Go to Work" button takes you</span>
+                        </div>
+                        <input type="text" id="setting-work-url" class="settings-text-input" value="${breakSettings.workUrl}">
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    `);
+
+    document.body.appendChild(sidebar);
+
+    // Filter Logic
+    const chips = sidebar.querySelectorAll('.filter-chip');
+    chips.forEach(chip => {
+        chip.onclick = (e) => {
+            e.stopPropagation();
+            chips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            selectedDayFilter = chip.dataset.filter;
+            
+            const titles = {
+                today: 'Watch History (Today)',
+                yesterday: 'Watch History (Yesterday)',
+                all: 'Watch History (Last 7 Days)'
+            };
+            const titleEl = document.getElementById('history-title');
+            if (titleEl) titleEl.textContent = titles[selectedDayFilter];
+            renderStats();
+        };
+    });
+
+
+
+    // View Navigation Logic
+    const switchView = (viewName) => {
+        activeView = viewName;
+        const hView = document.getElementById('history-view');
+        const aView = document.getElementById('analytics-view');
+        const sView = document.getElementById('settings-view');
+        const hFilters = document.getElementById('history-header-filters');
+        
+        if (hView) hView.style.display = (viewName === 'history' ? 'block' : 'none');
+        if (aView) aView.style.display = (viewName === 'analytics' ? 'block' : 'none');
+        if (sView) sView.style.display = (viewName === 'settings' ? 'block' : 'none');
+        if (hFilters) hFilters.style.display = (viewName === 'history' ? 'block' : 'none');
+
+        // Update Button Active States
+        ['nav-history', 'nav-analytics', 'nav-settings'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.toggle('active', id === `nav-${viewName}`);
+        });
+
+        renderStats();
+    };
+
+    const attachNav = (id, view) => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = (e) => { e.stopPropagation(); switchView(view); };
+    };
+
+    attachNav('nav-history', 'history');
+    attachNav('nav-analytics', 'analytics');
+    attachNav('nav-settings', 'settings');
+
+    // Settings Controls
+    const shortsToggle = document.getElementById('shorts-blocker-toggle');
+    if (shortsToggle) {
+        shortsToggle.onchange = (e) => {
+            e.stopPropagation();
+            shortsBlockerSettings.enabled = shortsToggle.checked;
+            saveShortsBlockerSettings();
+            applyShortsBlockerState();
+        };
+    }
+
+    const breakToggle = document.getElementById('break-enabled-toggle');
+    if (breakToggle) {
+        breakToggle.onchange = (e) => {
+            e.stopPropagation();
+            breakSettings.enabled = breakToggle.checked;
+            saveBreakSettings();
+            if (!breakSettings.enabled) {
+                continuousWatchStart = null;
+                breakModalShown = false;
+            }
+        };
+    }
+
+    const workUrlInput = document.getElementById('setting-work-url');
+    if (workUrlInput) {
+        workUrlInput.onchange = (e) => {
+            let url = workUrlInput.value.trim();
+            if (url && !url.startsWith('http')) url = 'https://' + url;
+            breakSettings.workUrl = url || 'https://www.google.com';
+            saveBreakSettings();
+        };
+    }
+
+    const intervalMinus = document.getElementById('interval-minus');
+
+    const intervalPlus = document.getElementById('interval-plus');
+    const intervalValue = document.getElementById('interval-value');
+    
+    if (intervalMinus) {
+        intervalMinus.onclick = (e) => {
+            e.stopPropagation();
+            breakSettings.intervalMinutes = Math.max(1, breakSettings.intervalMinutes - 5);
+            if (intervalValue) intervalValue.textContent = breakSettings.intervalMinutes;
+            saveBreakSettings();
+        };
+    }
+    if (intervalPlus) {
+        intervalPlus.onclick = (e) => {
+            e.stopPropagation();
+            breakSettings.intervalMinutes = Math.min(120, breakSettings.intervalMinutes + 5);
+            if (intervalValue) intervalValue.textContent = breakSettings.intervalMinutes;
+            saveBreakSettings();
+        };
+    }
+
+
+
+
+
+    btn.onclick = (e) => {
+        if (isDragging) return; // Don't toggle if we were dragging
+        e.stopPropagation();
+        isStatsOpen = !isStatsOpen;
+        sidebar.classList.toggle('open', isStatsOpen);
+        btn.classList.toggle('active', isStatsOpen);
+        if (isStatsOpen) renderStats();
+    };
+
+
+    const closeBtn = document.getElementById('close-stats');
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            isStatsOpen = false;
+            sidebar.classList.remove('open');
+            btn.classList.remove('active');
+        };
+    }
+
+    
+    // Close on escape
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isStatsOpen) {
+            isStatsOpen = false;
+            sidebar.classList.remove('open');
+            btn.classList.remove('active');
+        }
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        if (isStatsOpen && !sidebar.contains(e.target) && e.target !== btn) {
+            isStatsOpen = false;
+            sidebar.classList.remove('open');
+            btn.classList.remove('active');
+        }
+    });
+}
+
+function renderStats() {
+    let displayWatchTime = 0;
+    let displayVideos = [];
+    let displayDuration = 0;
+    
+    const now = new Date();
+    const today = getDayKey(now);
+    const yesterday = getDayKey(new Date(now.getTime() - 86400000));
+    
+    if (selectedDayFilter === 'today') {
+        const data = allHistory[today] || { watchTime: 0, videos: [], sessionStart: Date.now() };
+        displayWatchTime = data.watchTime;
+        displayVideos = data.videos;
+        displayDuration = Math.floor((Date.now() - data.sessionStart) / 1000);
+    } else if (selectedDayFilter === 'yesterday') {
+        const data = allHistory[yesterday] || { watchTime: 0, videos: [], sessionStart: 0 };
+        displayWatchTime = data.watchTime;
+        displayVideos = data.videos;
+        displayDuration = 0;
+    } else {
+        Object.values(allHistory).forEach(day => {
+            displayWatchTime += day.watchTime;
+            displayVideos = displayVideos.concat(day.videos);
+        });
+        displayDuration = 0;
+    }
+
+    if (activeView === 'history') {
+        const durationEl = document.getElementById('session-duration');
+        const watchTimeEl = document.getElementById('total-watch-time');
+        const countEl = document.getElementById('videos-count');
+        const listEl = document.getElementById('video-history-list');
+
+        // Update basic counts always
+        if (durationEl) {
+            if (selectedDayFilter === 'today') {
+                durationEl.parentElement.style.display = 'flex';
+                durationEl.textContent = formatTime(displayDuration);
+            } else {
+                durationEl.parentElement.style.display = 'none';
+            }
+        }
+        if (watchTimeEl) watchTimeEl.textContent = formatTime(displayWatchTime);
+        if (countEl) countEl.textContent = displayVideos.length;
+
+        // Check if we need to rebuild the list structure
+        const needsFullRebuild = (activeView !== lastRenderedView || 
+                                  selectedDayFilter !== lastRenderedFilter || 
+                                  displayVideos.length !== lastVideoCount);
+
+        if (needsFullRebuild && listEl) {
+            lastRenderedView = activeView;
+            lastRenderedFilter = selectedDayFilter;
+            lastVideoCount = displayVideos.length;
+
+            if (displayVideos.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding: 40px; color:#666;">No activity recorded for this period.</div>';
+            } else {
+                listEl.innerHTML = displayVideos.slice().reverse().map(v => {
+                    const percent = v.totalDuration > 0 ? Math.min(100, Math.round((v.watchedDuration / v.totalDuration) * 100)) : 0;
+                    return `
+                        <li class="history-item" data-video-id="${v.id}" data-time="${Math.floor(v.watchedDuration)}">
+                            <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
+                            <div class="history-info">
+                                <div class="video-header-row">
+                                    <span class="video-title" title="${v.title}">${v.title}</span>
+                                    <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
+                                </div>
+                                <div class="video-meta">
+                                    <span class="time-readout">${formatTime(Math.round(v.watchedDuration))} / ${formatTime(Math.round(v.totalDuration))}</span>
+                                    <span class="video-percent">${percent}% watched</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-fill" style="width: ${percent}%"></div>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
+
+                // Re-bind handlers
+                listEl.querySelectorAll('.history-item').forEach(item => {
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        const vid = item.dataset.videoId;
+                        const t = item.dataset.time;
+                        if (vid && vid !== 'undefined') {
+                            window.location.href = `https://www.youtube.com/watch?v=${vid}&t=${t}s`;
+                        }
+                    };
+                    const delBtn = item.querySelector('.delete-video-btn');
+                    if (delBtn) {
+                        delBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            const vid = item.dataset.videoId;
+                            Object.keys(allHistory).forEach(key => {
+                                allHistory[key].videos = allHistory[key].videos.filter(v => v.id !== vid);
+                            });
+                            saveHistory();
+                            lastVideoCount = -1; // Force rebuild
+                            renderStats();
+                        };
+                    }
+                });
+            }
+        } else if (listEl && lastVideoId) {
+            // Incremental update for the active video
+            const activeItem = listEl.querySelector(`.history-item[data-video-id="${lastVideoId}"]`);
+            if (activeItem) {
+                const videoData = displayVideos.find(v => v.id === lastVideoId);
+                if (videoData) {
+                    const timeEl = activeItem.querySelector('.time-readout');
+                    const percentEl = activeItem.querySelector('.video-percent');
+                    const progressEl = activeItem.querySelector('.progress-bar-fill');
+                    const percent = videoData.totalDuration > 0 ? Math.min(100, Math.round((videoData.watchedDuration / videoData.totalDuration) * 100)) : 0;
+                    
+                    if (timeEl) timeEl.textContent = `${formatTime(Math.round(videoData.watchedDuration))} / ${formatTime(Math.round(videoData.totalDuration))}`;
+                    if (percentEl) percentEl.textContent = `${percent}% watched`;
+                    if (progressEl) progressEl.style.width = `${percent}%`;
+                    activeItem.dataset.time = Math.floor(videoData.watchedDuration);
+                }
+            }
+        }
+    } else {
+        if (activeView !== lastRenderedView) {
+            lastRenderedView = activeView;
+            renderAnalyticsView();
+        }
+    }
+}
+
+function renderChart() {
+
+    const chartContainer = document.getElementById('stats-chart');
+    if (!chartContainer) return;
+
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = getDayKey(d);
+        last7Days.push({
+            key,
+            label: (i === 0 ? 'T' : d.getDate()),
+            value: allHistory[key] ? allHistory[key].watchTime : 0,
+            color: dayColors[i]
+        });
+    }
+
+    const maxValue = Math.max(...last7Days.map(d => d.value), 3600);
+    
+    chartContainer.innerHTML = last7Days.map(d => {
+        const height = Math.max(5, (d.value / maxValue) * 100);
+        return `
+            <div class="chart-bar-wrapper" title="${d.key}: ${formatTime(Math.round(d.value))}">
+                <div class="chart-bar-outer">
+                    <div class="chart-bar-fill" style="height: ${height}%; background: ${d.color}"></div>
+                </div>
+                <span class="chart-label">${d.label}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAnalyticsView() {
+    renderChart();
+    
+    const pieChart = document.getElementById('pie-chart');
+    const pieLegend = document.getElementById('pie-legend');
+    if (!pieChart || !pieLegend) return;
+
+    const last7Days = [];
+    let totalWatchAll = 0;
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = getDayKey(d);
+        const val = allHistory[key] ? allHistory[key].watchTime : 0;
+        last7Days.push({ label: (i === 0 ? 'Today' : key), value: val, color: dayColors[i] });
+        totalWatchAll += val;
+    }
+
+    if (totalWatchAll === 0) {
+        pieChart.style.background = '#333';
+        pieLegend.innerHTML = '<div style="color:#666">No data to display</div>';
+        return;
+    }
+
+    let cumulativePercent = 0;
+    const gradientSlices = last7Days.map(d => {
+        if (d.value === 0) return null;
+        const start = cumulativePercent;
+        const end = start + (d.value / totalWatchAll) * 100;
+        cumulativePercent = end;
+        return `${d.color} ${start}% ${end}%`;
+    }).filter(Boolean);
+
+    pieChart.style.background = `conic-gradient(${gradientSlices.join(', ')})`;
+    
+    pieLegend.innerHTML = last7Days.filter(d => d.value > 0).map(d => `
+        <div class="legend-item">
+            <span class="legend-color" style="background: ${d.color}"></span>
+            <span class="legend-label">${d.label}</span>
+            <span class="legend-value">${Math.round((d.value/totalWatchAll)*100)}%</span>
+        </div>
+    `).join('');
+
+    const insightEl = document.getElementById('key-insights');
+    if (insightEl) {
+        const sorted = [...last7Days].sort((a,b) => b.value - a.value);
+        const maxDay = sorted[0];
+        const avgTime = totalWatchAll / 7;
+        insightEl.innerHTML = `
+            <div class="insight-card">
+                <h4>Top Activity</h4>
+                <p>Your highest watch time was on <strong>${maxDay.label}</strong> with <strong>${formatTime(Math.round(maxDay.value))}</strong>.</p>
+            </div>
+            <div class="insight-card">
+                <h4>Weekly Average</h4>
+                <p>You watch about <strong>${formatTime(Math.round(avgTime))}</strong> of YouTube per day.</p>
+            </div>
+        `;
+    }
+}
+
+
+
+
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds === null || seconds === undefined) return '00:00:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return [h, m, s].map(v => v < 10 ? '0' + v : v).join(':');
+}
+
+// Break Reminder Functions
+async function fetchZenQuote() {
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: 'FETCH_QUOTE' }, (response) => {
+            if (response && response.text) {
+                resolve(response);
+            } else {
+                // Randomized local fallbacks if message fails
+                const fallbacks = [
+                    { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+                    { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
+                    { text: "Everything you've ever wanted is on the other side of fear.", author: "George Addair" }
+                ];
+                resolve(fallbacks[Math.floor(Math.random() * fallbacks.length)]);
+            }
+        });
+    });
+}
+
+function showBreakModal(quote) {
+    if (document.getElementById('break-reminder-modal')) return;
+    
+    // Default fallback if quote failed
+    const finalQuote = quote || { text: "The secret of getting ahead is getting started.", author: "Mark Twain" };
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'break-reminder-modal';
+    overlay.className = 'break-modal-overlay';
+    overlay.innerHTML = `
+        <div class="break-modal">
+            <div class="break-modal-icon">☕</div>
+            <h2 class="break-modal-title">Time for a Break!</h2>
+            <p class="break-modal-subtitle">You've been watching for ${breakSettings.intervalMinutes} minutes straight.</p>
+            <blockquote class="break-modal-quote">
+                <p>"${finalQuote.text}"</p>
+                <cite>— ${finalQuote.author}</cite>
+            </blockquote>
+            <div class="break-modal-actions">
+                <button id="break-keep-watching" class="break-btn secondary">Keep Watching</button>
+                <button id="break-go-work" class="break-btn primary">Go to Work</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    // Animate in
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    
+    document.getElementById('break-keep-watching').onclick = () => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 300);
+        continuousWatchStart = Date.now(); // Reset timer
+        breakModalShown = false;
+        preFetchedQuote = null; // Clear pre-fetched for next cycle
+        
+        // Resume video playback
+        const video = document.querySelector('video');
+        if (video) video.play();
+    };
+    
+    document.getElementById('break-go-work').onclick = () => {
+        window.location.href = breakSettings.workUrl || 'https://www.google.com';
+    };
+}
+
+
+function checkBreakReminder() {
+    if (!breakSettings.enabled) return;
+    
+    const video = document.querySelector('video');
+    if (!video || video.paused) {
+        continuousWatchStart = null;
+        breakModalShown = false;
+        return;
+    }
+    
+    if (!continuousWatchStart) {
+        continuousWatchStart = Date.now();
+        return;
+    }
+    
+    const elapsed = (Date.now() - continuousWatchStart) / 1000 / 60; // minutes
+    
+    // Pre-fetch quote 5 seconds before the interval (5/60 minutes)
+    const preFetchThreshold = breakSettings.intervalMinutes - (5 / 60);
+    if (elapsed >= preFetchThreshold && !preFetchedQuote && !isFetchingQuote) {
+        isFetchingQuote = true;
+        fetchZenQuote().then(quote => {
+            preFetchedQuote = quote;
+            isFetchingQuote = false;
+        });
+    }
+
+    if (elapsed >= breakSettings.intervalMinutes && !breakModalShown) {
+        breakModalShown = true;
+        video.pause();
+        showBreakModal(preFetchedQuote);
+    }
+}
+
+
+// Initial Run
+applyShortsBlockerState();
+injectStatsUI();
+
+
+// Intervals
+setInterval(() => {
+    updateStats();
+    checkBreakReminder();
+}, 1000);
+
+
+// Observe DOM changes for dynamic elements
+const observer = new MutationObserver(() => {
+    if (shortsBlockerSettings.enabled) blockShorts();
+    // Ensure UI is re-injected if YouTube's SPA wipes it
+    injectStatsUI();
+});
+
+observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+});
+
+// Handle YouTube's custom navigation events
+window.addEventListener('yt-page-data-updated', () => {
+    applyShortsBlockerState();
+    injectStatsUI();
+});
+window.addEventListener('yt-navigate-finish', () => {
+    applyShortsBlockerState();
+    injectStatsUI();
+});
+window.addEventListener('popstate', () => {
+    if (shortsBlockerSettings.enabled) blockShorts();
+});
+

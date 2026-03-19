@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Time Tracker",
+  "version": "1.0",
+  "description": "Track your YouTube time and stay focused.",
+  "permissions": ["storage", "webNavigation"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "https://zenquotes.io/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "css": ["content.css"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Shorts Blocker"
+  }
+}
