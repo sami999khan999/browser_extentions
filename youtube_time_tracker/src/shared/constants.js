@@ -45,7 +45,7 @@ ytd-mini-guide-entry-renderer a[href="/shorts"] {
 `;
 
 const dayColors = [
-    '#ff4e4e', // Today (Red)
+    '#FF0033', // Today (Revised Primary)
     '#ff8a00', // -1
     '#ffc700', // -2
     '#00e000', // -3

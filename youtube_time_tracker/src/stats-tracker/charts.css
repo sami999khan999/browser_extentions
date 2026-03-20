@@ -19,8 +19,8 @@
 .section-icon {
     width: 28px;
     height: 28px;
-    background: rgba(255, 0, 0, 0.1);
-    color: #ff0000;
+    background: rgba(255, 0, 51, 0.1);
+    color: var(--stats-primary);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -74,7 +74,7 @@
     position: absolute;
     bottom: 0;
     width: 100%;
-    background: linear-gradient(to top, #ff0000, #ff4e4e);
+    background: linear-gradient(to top, var(--stats-primary), #ff4e5c); /* Adjusted #ff4e4e to match FF0033 hue */
     border-radius: 6px;
     transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -174,7 +174,7 @@
     margin: 0;
     font-size: 11px;
     font-weight: 800;
-    color: #ff0000;
+    color: var(--stats-primary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -215,6 +215,6 @@
 }
 
 .stats-tooltip b {
-    color: #ff0000;
+    color: var(--stats-primary);
     margin-right: 4px;
 }

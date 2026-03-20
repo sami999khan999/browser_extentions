@@ -31,6 +31,7 @@ const JS_FILES = [
     'stats-tracker/sidebar-template.js',
     'stats-tracker/sidebar-events.js',
     'stats-tracker/sidebar-ui.js',
+    'stats-tracker/fullscreen-auto-hide.js',
     'stats-tracker/history-render.js',
     'stats-tracker/analytics-render.js',
 

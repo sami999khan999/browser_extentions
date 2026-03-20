@@ -3,6 +3,7 @@
 // Initial Run
 applyShortsBlockerState();
 injectStatsUI();
+setupFullscreenAutoHide();
 
 
 // Intervals

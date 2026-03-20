@@ -77,7 +77,7 @@
 
 .break-modal-quote {
     background: var(--stats-quote-bg);
-    border-left: 4px solid #ff0000;
+    border-left: 4px solid var(--stats-primary);
     border-radius: 4px 16px 16px 4px;
     padding: 24px 28px;
     margin: 0 0 36px;
@@ -91,7 +91,7 @@
     top: 10px;
     left: 10px;
     font-size: 40px;
-    color: rgba(255, 0, 0, 0.1);
+    color: rgba(255, 0, 51, 0.1);
     font-family: serif;
 }
 
@@ -141,15 +141,15 @@
 }
 
 .break-btn.primary {
-    background: #ff0000;
+    background: var(--stats-primary);
     color: white;
-    box-shadow: 0 8px 20px rgba(255, 0, 0, 0.2);
+    box-shadow: 0 8px 20px rgba(255, 0, 51, 0.2);
 }
 
 .break-btn.primary:hover {
-    background: #e60000;
+    background: #e6002e; /* Adjusted #e60000 to match FF0033 hue */
     transform: translateY(-2px);
-    box-shadow: 0 12px 24px rgba(255, 0, 0, 0.3);
+    box-shadow: 0 12px 24px rgba(255, 0, 51, 0.3);
 }
 
 /* Mobile Responsive: Bottom Sheet */

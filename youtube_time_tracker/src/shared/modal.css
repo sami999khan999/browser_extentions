@@ -88,14 +88,14 @@
 }
 
 .modal-btn.danger {
-    background: #ff0000;
+    background: var(--stats-primary);
     color: white;
 }
 
 .modal-btn.danger:hover {
-    background: #e60000;
+    background: #e6002e; /* Adjusted #e60000 to match FF0033 hue */
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(255, 0, 51, 0.2);
 }
 
 /* Mobile Responsive */

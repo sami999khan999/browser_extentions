@@ -35,9 +35,9 @@
     border-bottom: none;
 }
 
-.settings-item:hover {
-    /* background: var(--stats-border); */
-}
+/* .settings-item:hover {
+    background: var(--stats-border);
+} */
 
 .settings-item.vertical {
     flex-direction: column;
@@ -57,7 +57,7 @@
 }
 
 .item-icon {
-    color: #ff0000;
+    color: var(--stats-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -103,7 +103,7 @@
 
 .settings-text-input:focus {
     outline: none;
-    border-color: #ff0000;
+    border-color: var(--stats-primary);
     background: var(--stats-bg);
 }
 
@@ -147,7 +147,7 @@
 }
 
 .toggle-switch input:checked + .toggle-slider {
-    background: #ff0000;
+    background: var(--stats-primary);
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
@@ -187,7 +187,7 @@
 .interval-value {
     font-size: 16px;
     font-weight: 700;
-    color: #ff0000;
+    color: var(--stats-primary);
     width: 48px;
     text-align: center;
     background: transparent;
@@ -211,8 +211,8 @@
 .danger-btn {
     width: 100%;
     background: transparent;
-    border: 1px solid rgba(255, 0, 0, 0.4);
-    color: #ff4d4d;
+    border: 1px solid rgba(255, 0, 51, 0.4);
+    color: var(--stats-primary);
     padding: 14px;
     border-radius: 12px;
     font-size: 14px;
@@ -226,10 +226,10 @@
 }
 
 .danger-btn:hover {
-    background: rgba(255, 0, 0, 0.08);
-    border-color: #ff0000;
-    color: #ff0000;
-    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.1);
+    background: rgba(255, 0, 51, 0.08);
+    border-color: var(--stats-primary);
+    color: var(--stats-primary);
+    box-shadow: 0 4px 15px rgba(255, 0, 51, 0.1);
 }
 
 .danger-btn svg {

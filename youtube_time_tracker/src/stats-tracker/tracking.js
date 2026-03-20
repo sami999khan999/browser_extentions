@@ -16,10 +16,11 @@ function updateStats() {
         allHistory[currentDay] = { watchTime: 0, videos: [], sessionStart: now };
     }
     const todayData = allHistory[currentDay];
+    const isNewVideo = videoId !== lastVideoId;
 
     if (videoId) {
-        if (videoId !== lastVideoId) {
-            lastVideoId = videoId;
+        if (isNewVideo || !todayData.videos.find(v => v.id === videoId)) {
+            if (isNewVideo) lastVideoId = videoId;
             const videoTitleEl = document.querySelector('h1.ytd-watch-metadata') || 
                                  document.querySelector('.ytd-video-primary-info-renderer h1.title') ||
                                  document.querySelector('h1.title.ytd-video-primary-info-renderer');

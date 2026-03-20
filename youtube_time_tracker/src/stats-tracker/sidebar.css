@@ -36,7 +36,7 @@
 }
 
 .sidebar-resizer:hover, .sidebar-resizer.active {
-    background: rgba(255, 0, 0, 0.3);
+    background: rgba(255, 0, 51, 0.3);
 }
 
 body.yt-shorts-resizing-active {
@@ -70,7 +70,7 @@ body.yt-shorts-resizing-active {
 
 #stats-sidebar *::-webkit-scrollbar-thumb,
 #stats-sidebar::-webkit-scrollbar-thumb {
-    background: #ff0000 !important;
+    background: var(--stats-primary) !important;
     border-radius: 0 !important;
 }
 
@@ -124,8 +124,8 @@ body.yt-shorts-resizing-active {
 }
 
 .header-actions button.active {
-    color: #ff0000;
-    background: rgba(255, 0, 0, 0.1);
+    color: var(--stats-primary);
+    background: rgba(255, 0, 51, 0.1);
 }
 
 /* Filter Chips */
@@ -160,9 +160,9 @@ body.yt-shorts-resizing-active {
 }
 
 .filter-chip.active {
-    background: #ff0000;
+    background: var(--stats-primary);
     color: white;
-    border-color: #ff0000;
+    border-color: var(--stats-primary);
 }
 
 /* Close Button Override */
@@ -209,7 +209,7 @@ body.yt-shorts-resizing-active {
 }
 
 #nav-history.active, #nav-analytics.active, #nav-settings.active {
-    color: #ff0000; /* Red */
+    color: var(--stats-primary);
     background: transparent;
 }
 
@@ -239,13 +239,13 @@ body.yt-shorts-resizing-active {
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: #ff0000;
+    background: var(--stats-primary);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(255, 0, 51, 0.3);
     z-index: 2147483647;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -267,7 +267,7 @@ body.yt-shorts-resizing-active {
     font-weight: 700;
     padding: 2px 6px;
     border-radius: 10px;
-    border: 2px solid #ff0000;
+    border: 2px solid var(--stats-primary);
     min-width: 20px;
     text-align: center;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);

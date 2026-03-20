@@ -178,7 +178,7 @@ function updateTimerBadge(remainingMinutes) {
     if (remainingMinutes < 1) {
         const seconds = Math.ceil(remainingMinutes * 60);
         badge.textContent = `${seconds}s`;
-        badge.style.background = '#ff0000'; // High urgency
+        badge.style.background = '#FF0033'; // High urgency
     } else {
         badge.textContent = `${Math.ceil(remainingMinutes)}m`;
         badge.style.background = '#0f0f0f';

@@ -19,7 +19,7 @@
 
 .stat-card.accent {
     background: var(--stats-card-accent-bg);
-    border: 1px solid rgba(255, 0, 0, 0.2);
+    border: 1px solid rgba(255, 0, 51, 0.2);
 }
 
 .stat-card .stat-label {
@@ -37,7 +37,7 @@
 }
 
 .stat-card.accent span:not(.stat-label) {
-    color: #ff4e4e;
+    color: var(--stats-primary);
 }
 
 /* History Title */
@@ -157,7 +157,7 @@
 }
 
 .video-percent {
-    color: #ff0000;
+    color: var(--stats-primary);
     font-weight: 600;
 }
 
@@ -172,6 +172,6 @@
 
 .progress-bar-fill {
     height: 100%;
-    background: #ff0000;
+    background: var(--stats-primary);
     transition: width 0.3s ease;
 }
