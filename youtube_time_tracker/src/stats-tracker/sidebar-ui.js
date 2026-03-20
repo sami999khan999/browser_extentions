@@ -22,7 +22,7 @@ function injectStatsUI() {
     btn.title = 'YouTube Stats Tracker (Drag to Move)';
     
     // Position Persistence
-    const savedPos = localStorage.getItem('yt_stats_btn_pos');
+    const savedPos = localStorage.getItem('ytt_toggle_pos');
     if (savedPos) {
         const { top, left } = JSON.parse(savedPos);
         btn.style.top = top;
@@ -89,7 +89,7 @@ function injectStatsUI() {
                 
                 // Save state
                 setTimeout(() => {
-                    localStorage.setItem('yt_stats_btn_pos', JSON.stringify({
+                    localStorage.setItem('ytt_toggle_pos', JSON.stringify({
                         top: btn.style.top,
                         left: btn.style.left
                     }));
@@ -106,9 +106,9 @@ function injectStatsUI() {
     // Sidebar
     const sidebar = document.createElement('div');
     sidebar.id = 'stats-sidebar';
-
+    
     // Load and Apply Persisted Width
-    const savedWidth = localStorage.getItem('yt_stats_sidebar_width');
+    const savedWidth = localStorage.getItem('ytt_sidebar_width');
     if (savedWidth) {
         sidebar.style.width = savedWidth + 'px';
     }
@@ -145,8 +145,8 @@ function injectStatsUI() {
             isResizing = false;
             document.body.classList.remove('yt-shorts-resizing-active');
             sidebar.classList.remove('resizing');
-            resizer.classList.remove('active');
-            localStorage.setItem('yt_stats_sidebar_width', parseInt(sidebar.style.width, 10));
+            resizer.classList.add('active');
+            localStorage.setItem('ytt_sidebar_width', parseInt(sidebar.style.width, 10));
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
         };

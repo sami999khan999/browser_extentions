@@ -7,7 +7,7 @@ function getDayKey(date = new Date()) {
 
 function loadHistory() {
     try {
-        const data = localStorage.getItem('yt_shorts_blocker_history');
+        const data = localStorage.getItem('ytt_history');
         const history = data ? JSON.parse(data) : {};
         
         // Cleanup: Remove keys older than 7 days
@@ -29,7 +29,7 @@ function loadHistory() {
 
 function saveHistory() {
     try {
-        localStorage.setItem('yt_shorts_blocker_history', JSON.stringify(allHistory));
+        localStorage.setItem('ytt_history', JSON.stringify(allHistory));
     } catch (e) { console.error('Failed to save history:', e); }
 }
 
@@ -52,19 +52,19 @@ let lastVideoCount = -1;
 // Shorts Blocker State
 function loadShortsBlockerSettings() {
     try {
-        const data = localStorage.getItem('yt_shorts_blocker_settings');
+        const data = localStorage.getItem('ytt_shorts_settings');
         return data ? JSON.parse(data) : { enabled: true };
     } catch (e) { return { enabled: true }; }
 }
 function saveShortsBlockerSettings() {
-    localStorage.setItem('yt_shorts_blocker_settings', JSON.stringify(shortsBlockerSettings));
+    localStorage.setItem('ytt_shorts_settings', JSON.stringify(shortsBlockerSettings));
 }
 let shortsBlockerSettings = loadShortsBlockerSettings();
 
 // Break Reminder State
 function loadBreakSettings() {
     try {
-        const data = localStorage.getItem('yt_break_reminder_settings');
+        const data = localStorage.getItem('ytt_break_settings');
         return data ? JSON.parse(data) : { 
             enabled: true, 
             intervalMinutes: 15,
@@ -73,7 +73,7 @@ function loadBreakSettings() {
     } catch (e) { return { enabled: true, intervalMinutes: 15, workUrl: 'https://www.google.com' }; }
 }
 function saveBreakSettings() {
-    localStorage.setItem('yt_break_reminder_settings', JSON.stringify(breakSettings));
+    localStorage.setItem('ytt_break_settings', JSON.stringify(breakSettings));
 }
 let breakSettings = loadBreakSettings();
 
@@ -84,9 +84,9 @@ let isFetchingQuote = false;
 
 function clearAllData() {
     // Clear targeted extension keys
-    localStorage.removeItem('yt_shorts_blocker_history');
-    localStorage.removeItem('yt_shorts_blocker_settings');
-    localStorage.removeItem('yt_break_reminder_settings');
+    localStorage.removeItem('ytt_history');
+    localStorage.removeItem('ytt_shorts_settings');
+    localStorage.removeItem('ytt_break_settings');
     
     // Reset in-memory state
     const currentDay = getDayKey();
