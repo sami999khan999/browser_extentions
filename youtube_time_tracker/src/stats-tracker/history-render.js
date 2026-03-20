@@ -65,7 +65,10 @@ function renderStats() {
                             <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
                             <div class="history-info">
                                 <div class="video-header-row">
-                                    <span class="video-title" title="${v.title}">${v.title}</span>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <span class="video-title" title="${v.title}">${v.title}</span>
+                                        <span class="video-channel">${v.channelName || ''}</span>
+                                    </div>
                                     <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
                                 </div>
                                 <div class="video-meta">
@@ -95,12 +98,23 @@ function renderStats() {
                         delBtn.onclick = (e) => {
                             e.stopPropagation();
                             const vid = item.dataset.videoId;
-                            Object.keys(allHistory).forEach(key => {
-                                allHistory[key].videos = allHistory[key].videos.filter(v => v.id !== vid);
+                            const videoTitle = item.querySelector('.video-title').textContent;
+
+                            showConfirmModal({
+                                title: 'Remove from History?',
+                                message: `Are you sure you want to remove "${videoTitle}" from your watch history?`,
+                                confirmText: 'Remove',
+                                cancelText: 'Cancel',
+                                icon: '🗑️',
+                                onConfirm: () => {
+                                    Object.keys(allHistory).forEach(key => {
+                                        allHistory[key].videos = allHistory[key].videos.filter(v => v.id !== vid);
+                                    });
+                                    saveHistory();
+                                    lastVideoCount = -1; // Force rebuild
+                                    renderStats();
+                                }
                             });
-                            saveHistory();
-                            lastVideoCount = -1; // Force rebuild
-                            renderStats();
                         };
                     }
                 });

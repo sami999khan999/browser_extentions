@@ -1,0 +1,118 @@
+/* === Generic Accessible Modals === */
+
+.stats-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--stats-modal-overlay);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.stats-modal-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.stats-modal {
+    background: var(--stats-sidebar-bg);
+    border: 1px solid var(--stats-border);
+    border-radius: 24px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: var(--stats-card-shadow);
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+}
+
+.stats-modal-overlay.visible .stats-modal {
+    transform: scale(1) translateY(0);
+}
+
+.stats-modal-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.stats-modal-title {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0 0 12px;
+    color: var(--stats-text-primary);
+}
+
+.stats-modal-message {
+    font-size: 15px;
+    color: var(--stats-text-secondary);
+    line-height: 1.6;
+    margin: 0 0 28px;
+}
+
+.stats-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.modal-btn {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    flex: 1;
+    transition: all 0.2s;
+}
+
+.modal-btn.secondary {
+    background: var(--stats-btn-bg);
+    color: var(--stats-text-primary);
+    border: 1px solid var(--stats-border);
+}
+
+.modal-btn.secondary:hover {
+    background: var(--stats-btn-hover);
+}
+
+.modal-btn.danger {
+    background: #ff0000;
+    color: white;
+}
+
+.modal-btn.danger:hover {
+    background: #e60000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+    .stats-modal-overlay {
+        align-items: flex-end;
+    }
+
+    .stats-modal {
+        width: 100%;
+        max-width: none;
+        border-radius: 20px 20px 0 0;
+        transform: translateY(100%);
+        padding: 32px 24px 24px;
+    }
+
+    .stats-modal-overlay.visible .stats-modal {
+        transform: translateY(0);
+    }
+}

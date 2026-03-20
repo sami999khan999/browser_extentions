@@ -22,6 +22,7 @@
       "matches": ["*://*.youtube.com/*"],
       "css": [
         "src/shared/theme.css",
+        "src/shared/modal.css",
         "src/stats-tracker/toggle-button.css",
         "src/stats-tracker/sidebar.css",
         "src/stats-tracker/dashboard.css",

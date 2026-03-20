@@ -23,7 +23,7 @@ function renderChart() {
     chartContainer.innerHTML = last7Days.map(d => {
         const height = Math.max(5, (d.value / maxValue) * 100);
         return `
-            <div class="chart-bar-wrapper" title="${d.key}: ${formatTime(Math.round(d.value))}">
+            <div class="chart-bar-wrapper" data-tooltip="<b>${d.key}</b><br>${formatTime(Math.round(d.value))}">
                 <div class="chart-bar-outer">
                     <div class="chart-bar-fill" style="height: ${height}%; background: ${d.color}"></div>
                 </div>
@@ -31,6 +31,48 @@ function renderChart() {
             </div>
         `;
     }).join('');
+
+    // Tooltip Logic
+    const tooltip = document.getElementById('stats-tooltip');
+    
+    chartContainer.querySelectorAll('.chart-bar-wrapper').forEach(bar => {
+        bar.onmouseenter = (e) => {
+            tooltip.innerHTML = bar.dataset.tooltip;
+            tooltip.classList.add('visible');
+            positionTooltip(e, tooltip); // Position immediately
+        };
+        bar.onmousemove = (e) => {
+            positionTooltip(e, tooltip);
+        };
+        bar.onmouseleave = () => {
+            tooltip.classList.remove('visible');
+        };
+    });
+}
+
+function positionTooltip(e, tooltip) {
+    const margin = 15;
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+    
+    let left = e.clientX + margin;
+    let top = e.clientY - margin;
+    
+    // Check horizontal flip
+    if (left + tooltipWidth > window.innerWidth) {
+        left = e.clientX - tooltipWidth - margin;
+    }
+    
+    // Check vertical overflow (ensure it doesn't go off top or bottom)
+    if (top < margin) {
+        top = margin;
+    }
+    if (top + tooltipHeight > window.innerHeight - margin) {
+        top = window.innerHeight - tooltipHeight - margin;
+    }
+    
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
 }
 
 function renderAnalyticsView() {
@@ -47,26 +89,35 @@ function renderAnalyticsView() {
         d.setDate(d.getDate() - i);
         const key = getDayKey(d);
         const val = allHistory[key] ? allHistory[key].watchTime : 0;
-        last7Days.push({ label: (i === 0 ? 'Today' : key), value: val, color: dayColors[i] });
+        last7Days.push({ 
+            label: (i === 0 ? 'Today' : key), 
+            value: val, 
+            color: dayColors[i],
+            date: key
+        });
         totalWatchAll += val;
     }
 
     if (totalWatchAll === 0) {
-        pieChart.style.background = '#333';
-        pieLegend.innerHTML = '<div style="color:#666">No data to display</div>';
+        pieChart.style.background = 'var(--stats-chart-bar-bg)';
+        pieLegend.innerHTML = '<div style="color:var(--stats-text-secondary)">No data to display</div>';
         return;
     }
 
+    // Pie Chart Tooltip logic
+    const tooltip = document.getElementById('stats-tooltip');
+    
+    // Prepare slices for tooltip logic
     let cumulativePercent = 0;
-    const gradientSlices = last7Days.map(d => {
+    const slices = last7Days.map(d => {
         if (d.value === 0) return null;
         const start = cumulativePercent;
         const end = start + (d.value / totalWatchAll) * 100;
         cumulativePercent = end;
-        return `${d.color} ${start}% ${end}%`;
+        return { ...d, start, end };
     }).filter(Boolean);
 
-    pieChart.style.background = `conic-gradient(${gradientSlices.join(', ')})`;
+    pieChart.style.background = `conic-gradient(${slices.map(s => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`;
     
     pieLegend.innerHTML = last7Days.filter(d => d.value > 0).map(d => `
         <div class="legend-item">
@@ -76,6 +127,29 @@ function renderAnalyticsView() {
         </div>
     `).join('');
 
+    pieChart.onmousemove = (e) => {
+        const rect = pieChart.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Calculate angle (0-360, starts at top)
+        let angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI) + 90;
+        if (angle < 0) angle += 360;
+        const percent = (angle / 360) * 100;
+        
+        const activeSlice = slices.find(s => percent >= s.start && percent < s.end);
+        if (activeSlice) {
+            tooltip.innerHTML = `<b>${activeSlice.label}</b><br>${formatTime(Math.round(activeSlice.value))} (${Math.round((activeSlice.value/totalWatchAll)*100)}%)`;
+            tooltip.classList.add('visible');
+            positionTooltip(e, tooltip);
+        } else {
+            tooltip.classList.remove('visible');
+        }
+    };
+    pieChart.onmouseleave = () => {
+        tooltip.classList.remove('visible');
+    };
+
     const insightEl = document.getElementById('key-insights');
     if (insightEl) {
         const sorted = [...last7Days].sort((a,b) => b.value - a.value);
@@ -83,11 +157,17 @@ function renderAnalyticsView() {
         const avgTime = totalWatchAll / 7;
         insightEl.innerHTML = `
             <div class="insight-card">
-                <h4>Top Activity</h4>
+                <div class="insight-header">
+                    <span class="insight-icon">🔥</span>
+                    <h4>Peak Activity</h4>
+                </div>
                 <p>Your highest watch time was on <strong>${maxDay.label}</strong> with <strong>${formatTime(Math.round(maxDay.value))}</strong>.</p>
             </div>
             <div class="insight-card">
-                <h4>Weekly Average</h4>
+                <div class="insight-header">
+                    <span class="insight-icon">📊</span>
+                    <h4>Weekly Average</h4>
+                </div>
                 <p>You watch about <strong>${formatTime(Math.round(avgTime))}</strong> of YouTube per day.</p>
             </div>
         `;

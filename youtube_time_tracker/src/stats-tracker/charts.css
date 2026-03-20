@@ -1,90 +1,105 @@
-/* === Analytics: Bar Chart, Pie Chart, Legend, Insights === */
+/* === Analytics Dashboard: YouTube Premium Aesthetics === */
 
 .analytics-section {
-    margin-bottom: 48px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--stats-border);
 }
 
-.analytics-section h3 {
+.analytics-section:last-child, .analytics-section.no-border {
+    border-bottom: none;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.section-icon {
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff0000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.section-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.section-header h3 {
+    margin: 0;
     font-size: 14px;
-    color: var(--stats-text-secondary);
-    margin-bottom: 16px;
-    font-weight: 500;
+    font-weight: 700;
+    color: var(--stats-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Bar Chart */
 #stats-chart {
+    height: 140px;
     display: flex;
-    justify-content: space-between;
     align-items: flex-end;
-    height: 120px;
-    padding: 0 4px;
-    gap: 8px;
+    gap: 12px;
+    padding: 0 10px 10px;
 }
 
 .chart-bar-wrapper {
     flex: 1;
-    height: 120px;
-    background: var(--stats-card-bg);
-    border-radius: 4px;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    overflow: hidden;
     align-items: center;
-    gap: 8px;
+    cursor: pointer;
 }
 
 .chart-bar-outer {
     flex: 1;
     width: 100%;
+    max-width: 32px;
     background: var(--stats-chart-bar-bg);
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
+    border-radius: 6px;
+    position: relative;
     overflow: hidden;
 }
 
 .chart-bar-fill {
+    position: absolute;
+    bottom: 0;
     width: 100%;
     background: linear-gradient(to top, #ff0000, #ff4e4e);
-    border-radius: 4px;
-    transition: height 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
-}
-
-.chart-bar-wrapper:hover .chart-bar-fill {
-    filter: brightness(1.2);
-    box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+    border-radius: 6px;
+    transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chart-label {
     font-size: 10px;
-    color: var(--stats-chart-label);
-    font-weight: 600;
+    color: var(--stats-text-secondary);
+    margin-top: 12px;
+    font-weight: 700;
 }
 
-.chart-bar-wrapper:last-child .chart-label {
-    color: #ff0000;
-}
-
-/* Pie Chart */
-.pie-chart-container {
+/* Distribution / Pie */
+.pie-layout {
     display: flex;
     align-items: center;
     gap: 24px;
-    padding: 16px;
-    background: var(--stats-card-bg);
-    border-radius: 16px;
+    padding: 0 10px;
 }
 
 #pie-chart {
     width: 120px;
     height: 120px;
     border-radius: 50%;
-    flex-shrink: 0;
-    box-shadow: 0 4px 15px var(--stats-shadow);
     position: relative;
+    flex-shrink: 0;
 }
 
 #pie-chart::after {
@@ -93,15 +108,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 60px;
-    height: 60px;
-    background: var(--stats-pie-center);
+    width: 50%;
+    height: 50%;
+    background: var(--stats-sidebar-bg);
     border-radius: 50%;
 }
 
-/* Legend */
 #pie-legend {
-    flex: 1;
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -110,13 +124,13 @@
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     font-size: 12px;
 }
 
 .legend-color {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
 }
 
@@ -126,29 +140,81 @@
 }
 
 .legend-value {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--stats-text-primary);
 }
 
-/* Insight Cards */
+/* Insights */
+.insights-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .insight-card {
     background: var(--stats-card-bg);
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 12px;
     border: 1px solid var(--stats-border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--stats-card-shadow);
+}
+
+.insight-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.insight-icon {
+    font-size: 16px;
 }
 
 .insight-card h4 {
-    margin: 0 0 8px 0;
-    font-size: 12px;
-    color: #ff4e4e;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 800;
+    color: #ff0000;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .insight-card p {
     margin: 0;
     font-size: 13px;
-    line-height: 1.4;
-    color: var(--stats-text-secondary);
+    line-height: 1.5;
+    color: var(--stats-text-primary);
+}
+
+.insight-card strong {
+    color: var(--stats-text-primary);
+    font-weight: 700;
+}
+
+/* Tooltip */
+.stats-tooltip {
+    position: fixed;
+    z-index: 2147483647;
+    background: var(--stats-sidebar-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--stats-border);
+    color: var(--stats-text-primary);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    pointer-events: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.1s ease-out;
+}
+
+.stats-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.stats-tooltip b {
+    color: #ff0000;
+    margin-right: 4px;
 }

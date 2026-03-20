@@ -25,10 +25,16 @@ function updateStats() {
                                  document.querySelector('h1.title.ytd-video-primary-info-renderer');
             const title = videoTitleEl ? videoTitleEl.textContent.trim() : 'Loading Video...';
             
+            const channelNameEl = document.querySelector('#upload-info #channel-name a') || 
+                                  document.querySelector('ytd-video-owner-renderer #channel-name a') ||
+                                  document.querySelector('#owner-sub-count'); // fallback to find the container
+            const channelName = channelNameEl ? channelNameEl.textContent.trim() : 'Loading Channel...';
+
             if (!todayData.videos.find(v => v.id === videoId)) {
                 todayData.videos.push({
                     id: videoId,
                     title: title,
+                    channelName: channelName,
                     thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
                     startTime: new Date().toLocaleTimeString(),
                     watchedDuration: 0,
@@ -43,6 +49,12 @@ function updateStats() {
                  const videoTitleEl = document.querySelector('h1.ytd-watch-metadata') || 
                                       document.querySelector('.ytd-video-primary-info-renderer h1.title');
                  if (videoTitleEl) activeVideo.title = videoTitleEl.textContent.trim();
+            }
+
+            if (activeVideo.channelName === 'Loading Channel...') {
+                const channelNameEl = document.querySelector('#upload-info #channel-name a') || 
+                                      document.querySelector('ytd-video-owner-renderer #channel-name a');
+                if (channelNameEl) activeVideo.channelName = channelNameEl.textContent.trim();
             }
 
             if ((!activeVideo.totalDuration || activeVideo.totalDuration === 0) && isFinite(video.duration) && video.duration > 0) {

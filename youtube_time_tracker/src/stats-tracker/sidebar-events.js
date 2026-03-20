@@ -1,6 +1,6 @@
 // === Sidebar Event Bindings: Filters, navigation, settings, open/close ===
 
-function bindSidebarEvents(sidebar, btn, isDragging) {
+function bindSidebarEvents(sidebar, btn, dragStatus) {
     // Filter Logic
     const chips = sidebar.querySelectorAll('.filter-chip');
     chips.forEach(chip => {
@@ -93,28 +93,96 @@ function bindSidebarEvents(sidebar, btn, isDragging) {
     if (intervalMinus) {
         intervalMinus.onclick = (e) => {
             e.stopPropagation();
-            breakSettings.intervalMinutes = Math.max(1, breakSettings.intervalMinutes - 5);
-            if (intervalValue) intervalValue.textContent = breakSettings.intervalMinutes;
+            breakSettings.intervalMinutes = Math.max(1, breakSettings.intervalMinutes - 1);
+            if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
             saveBreakSettings();
         };
     }
     if (intervalPlus) {
         intervalPlus.onclick = (e) => {
             e.stopPropagation();
-            breakSettings.intervalMinutes = Math.min(120, breakSettings.intervalMinutes + 5);
-            if (intervalValue) intervalValue.textContent = breakSettings.intervalMinutes;
+            breakSettings.intervalMinutes = Math.min(120, breakSettings.intervalMinutes + 1);
+            if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
             saveBreakSettings();
+        };
+    }
+    if (intervalValue) {
+        intervalValue.onchange = (e) => {
+            let val = parseInt(intervalValue.value, 10);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > 120) val = 120;
+            breakSettings.intervalMinutes = val;
+            intervalValue.value = val;
+            saveBreakSettings();
+        };
+    }
+
+    // Clear Data Action
+    const clearDataBtn = document.getElementById('clear-all-data');
+    if (clearDataBtn) {
+        clearDataBtn.onclick = (e) => {
+            e.stopPropagation();
+            
+            showConfirmModal({
+                title: 'Clear All Data?',
+                message: 'Are you sure you want to delete all watch history and reset all settings? This action cannot be undone.',
+                confirmText: 'Clear All',
+                cancelText: 'Cancel',
+                icon: '🗑️',
+                onConfirm: () => {
+                    clearAllData();
+                    
+                    // Update UI elements immediately
+                    const intervalVal = document.getElementById('interval-value');
+                    if (intervalVal) intervalVal.value = breakSettings.intervalMinutes;
+                    
+                    const sToggle = document.getElementById('shorts-blocker-toggle');
+                    if (sToggle) sToggle.checked = shortsBlockerSettings.enabled;
+                    
+                    const bToggle = document.getElementById('break-enabled-toggle');
+                    if (bToggle) bToggle.checked = breakSettings.enabled;
+                    
+                    const wUrlInput = document.getElementById('setting-work-url');
+                    if (wUrlInput) wUrlInput.value = breakSettings.workUrl;
+                    
+                    // Show history view to indicate completion
+                    switchView('history');
+                    renderStats();
+                    
+                    // Visual feedback on the button
+                    const originalHtml = clearDataBtn.innerHTML;
+                    clearDataBtn.textContent = 'Data Cleared!';
+                    clearDataBtn.style.background = '#2ecc71';
+                    clearDataBtn.style.color = 'white';
+                    clearDataBtn.style.borderColor = '#2ecc71';
+                    setTimeout(() => {
+                        clearDataBtn.innerHTML = originalHtml;
+                        clearDataBtn.style.background = '';
+                        clearDataBtn.style.color = '';
+                        clearDataBtn.style.borderColor = '';
+                    }, 2000);
+                }
+            });
         };
     }
 
     // Toggle sidebar open/close
     btn.onclick = (e) => {
-        if (isDragging) return; // Don't toggle if we were dragging
+        if (dragStatus.isDragging) return; // Don't toggle if we were dragging
         e.stopPropagation();
         isStatsOpen = !isStatsOpen;
+        
         sidebar.classList.toggle('open', isStatsOpen);
         btn.classList.toggle('active', isStatsOpen);
-        if (isStatsOpen) renderStats();
+        
+        if (isStatsOpen) {
+            document.body.classList.add('stats-sidebar-active');
+            document.body.style.overflow = 'hidden';
+            renderStats();
+        } else {
+            document.body.classList.remove('stats-sidebar-active');
+            document.body.style.overflow = '';
+        }
     };
 
     const closeBtn = document.getElementById('close-stats');
@@ -124,6 +192,8 @@ function bindSidebarEvents(sidebar, btn, isDragging) {
             isStatsOpen = false;
             sidebar.classList.remove('open');
             btn.classList.remove('active');
+            document.body.classList.remove('stats-sidebar-active');
+            document.body.style.overflow = '';
         };
     }
 
@@ -133,6 +203,8 @@ function bindSidebarEvents(sidebar, btn, isDragging) {
             isStatsOpen = false;
             sidebar.classList.remove('open');
             btn.classList.remove('active');
+            document.body.classList.remove('stats-sidebar-active');
+            document.body.style.overflow = '';
         }
     });
 
@@ -142,6 +214,16 @@ function bindSidebarEvents(sidebar, btn, isDragging) {
             isStatsOpen = false;
             sidebar.classList.remove('open');
             btn.classList.remove('active');
+            document.body.classList.remove('stats-sidebar-active');
+            document.body.style.overflow = '';
         }
     });
+
+    // Sidebar hover logic (simplified as global lock is now primary)
+    sidebar.onmouseenter = () => {
+        // Already handled by global lock if open
+    };
+    sidebar.onmouseleave = () => {
+        if (!isStatsOpen) document.body.style.overflow = '';
+    };
 }

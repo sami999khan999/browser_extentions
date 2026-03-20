@@ -4,10 +4,21 @@ function injectStatsUI() {
     if (!document.body) return;
     if (document.getElementById('stats-toggle-btn')) return;
 
+    // Tooltip (Global sibling of sidebar)
+    if (!document.getElementById('stats-tooltip')) {
+        const tooltip = document.createElement('div');
+        tooltip.id = 'stats-tooltip';
+        tooltip.className = 'stats-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
     // Toggle Button
     const btn = document.createElement('div');
     btn.id = 'stats-toggle-btn';
-    btn.innerHTML = icons.stats_toggle;
+    btn.innerHTML = `
+        ${icons.stats_toggle}
+        <span id="stats-timer-badge" class="stats-timer-badge" style="display: none;"></span>
+    `;
     btn.title = 'YouTube Stats Tracker (Drag to Move)';
     
     // Position Persistence
@@ -23,11 +34,11 @@ function injectStatsUI() {
     document.body.appendChild(btn);
 
     // Draggable Logic
-    let isDragging = false;
+    const dragStatus = { isDragging: false };
     let startX, startY, btnStartX, btnStartY;
 
     btn.onmousedown = (e) => {
-        isDragging = false;
+        dragStatus.isDragging = false;
         startX = e.clientX;
         startY = e.clientY;
         const rect = btn.getBoundingClientRect();
@@ -39,7 +50,7 @@ function injectStatsUI() {
             const dy = moveEvent.clientY - startY;
             
             if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-                isDragging = true;
+                dragStatus.isDragging = true;
                 btn.classList.add('dragging');
                 
                 let newLeft = btnStartX + dx;
@@ -61,7 +72,7 @@ function injectStatsUI() {
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
             
-            if (isDragging) {
+            if (dragStatus.isDragging) {
                 btn.classList.remove('dragging');
                 
                 // Springy Edge Snapping with Scrollbar Awareness
@@ -82,7 +93,9 @@ function injectStatsUI() {
                         top: btn.style.top,
                         left: btn.style.left
                     }));
-                }, 300);
+                    // Reset dragging status AFTER the click event has a chance to fire
+                    dragStatus.isDragging = false;
+                }, 200);
             }
         };
 
@@ -147,5 +160,5 @@ function injectStatsUI() {
     document.body.appendChild(sidebar);
 
     // Bind all events (filters, navigation, settings, open/close)
-    bindSidebarEvents(sidebar, btn, isDragging);
+    bindSidebarEvents(sidebar, btn, dragStatus);
 }

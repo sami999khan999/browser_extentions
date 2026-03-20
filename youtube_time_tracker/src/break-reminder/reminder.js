@@ -27,10 +27,16 @@ function showBreakModal(quote) {
     const overlay = document.createElement('div');
     overlay.id = 'break-reminder-modal';
     overlay.className = 'break-modal-overlay';
+    // Accessibility: Role and Aria
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'break-modal-title');
+    
     overlay.innerHTML = `
         <div class="break-modal">
+            <div class="modal-drag-handle"></div>
             <div class="break-modal-icon">☕</div>
-            <h2 class="break-modal-title">Time for a Break!</h2>
+            <h2 id="break-modal-title" class="break-modal-title">Time for a Break!</h2>
             <p class="break-modal-subtitle">You've been watching for ${breakSettings.intervalMinutes} minutes straight.</p>
             <blockquote class="break-modal-quote">
                 <p>"${finalQuote.text}"</p>
@@ -44,12 +50,66 @@ function showBreakModal(quote) {
     `;
     document.body.appendChild(overlay);
     
+    // Prevent background scroll and selection
+    document.body.style.overflow = 'hidden';
+    document.body.style.userSelect = 'none';
+    
+    const modal = overlay.querySelector('.break-modal');
+    const keepWatchingBtn = document.getElementById('break-keep-watching');
+    const goWorkBtn = document.getElementById('break-go-work');
+    
+    // Focus the first action button
+    setTimeout(() => keepWatchingBtn.focus(), 100);
+    
     // Animate in
     requestAnimationFrame(() => overlay.classList.add('visible'));
-    
-    document.getElementById('break-keep-watching').onclick = () => {
+
+    // Swipe to Dismiss (Mobile)
+    let touchStartY = 0;
+    let currentY = 0;
+    let isSwiping = false;
+
+    modal.addEventListener('touchstart', (e) => {
+        if (window.innerWidth > 600) return;
+        touchStartY = e.touches[0].clientY;
+        modal.style.transition = 'none';
+        isSwiping = true;
+    }, { passive: true });
+
+    modal.addEventListener('touchmove', (e) => {
+        if (!isSwiping) return;
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - touchStartY;
+        
+        if (deltaY > 0) { // Only allow swiping down
+            modal.style.transform = `translateY(${deltaY}px)`;
+        }
+    }, { passive: true });
+
+    modal.addEventListener('touchend', () => {
+        if (!isSwiping) return;
+        isSwiping = false;
+        modal.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+        
+        const deltaY = currentY - touchStartY;
+        if (deltaY > 120) {
+            // Dismiss
+            dismissModal();
+        } else {
+            // Snap back
+            modal.style.transform = 'translateY(0)';
+        }
+    });
+
+    const dismissModal = () => {
         overlay.classList.remove('visible');
-        setTimeout(() => overlay.remove(), 300);
+        document.body.style.overflow = ''; // Restore scroll
+        document.body.style.userSelect = ''; // Restore selection
+        
+        if (window.innerWidth <= 600) {
+            modal.style.transform = 'translateY(100%)';
+        }
+        setTimeout(() => overlay.remove(), 400);
         continuousWatchStart = Date.now(); // Reset timer
         breakModalShown = false;
         preFetchedQuote = null; // Clear pre-fetched for next cycle
@@ -59,19 +119,84 @@ function showBreakModal(quote) {
         if (video) video.play();
     };
     
-    document.getElementById('break-go-work').onclick = () => {
-        window.location.href = breakSettings.workUrl || 'https://www.google.com';
+    // Accessibility: Click outside to close
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            dismissModal();
+        }
     };
+
+    // Accessibility: Focus Trap (Tab behavior)
+    overlay.onkeydown = (e) => {
+        if (e.key === 'Tab') {
+            const focusables = [keepWatchingBtn, goWorkBtn];
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            
+            if (e.shiftKey) { // Shift + Tab
+                if (document.activeElement === first) {
+                    last.focus();
+                    e.preventDefault();
+                }
+            } else { // Tab
+                if (document.activeElement === last) {
+                    first.focus();
+                    e.preventDefault();
+                }
+            }
+        }
+        if (e.key === 'Escape') {
+            dismissModal();
+        }
+    };
+    
+    if (keepWatchingBtn) {
+        keepWatchingBtn.onclick = (e) => {
+            e.stopPropagation();
+            dismissModal();
+        };
+    }
+
+    if (goWorkBtn) {
+        goWorkBtn.onclick = () => {
+            window.location.href = breakSettings.workUrl || 'https://www.google.com';
+        };
+    }
+}
+
+function updateTimerBadge(remainingMinutes) {
+    const badge = document.getElementById('stats-timer-badge');
+    if (!badge) return;
+
+    if (!breakSettings.enabled || remainingMinutes <= 0 || breakModalShown) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    badge.style.display = 'block';
+    
+    if (remainingMinutes < 1) {
+        const seconds = Math.ceil(remainingMinutes * 60);
+        badge.textContent = `${seconds}s`;
+        badge.style.background = '#ff0000'; // High urgency
+    } else {
+        badge.textContent = `${Math.ceil(remainingMinutes)}m`;
+        badge.style.background = '#0f0f0f';
+    }
 }
 
 
 function checkBreakReminder() {
-    if (!breakSettings.enabled) return;
+    if (!breakSettings.enabled) {
+        updateTimerBadge(0);
+        return;
+    }
     
     const video = document.querySelector('video');
     if (!video || video.paused) {
         continuousWatchStart = null;
         breakModalShown = false;
+        updateTimerBadge(0);
         return;
     }
     
@@ -96,5 +221,8 @@ function checkBreakReminder() {
         breakModalShown = true;
         video.pause();
         showBreakModal(preFetchedQuote);
+        updateTimerBadge(0);
+    } else {
+        updateTimerBadge(breakSettings.intervalMinutes - elapsed);
     }
 }

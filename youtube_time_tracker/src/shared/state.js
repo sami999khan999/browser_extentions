@@ -81,3 +81,27 @@ let continuousWatchStart = null;
 let breakModalShown = false;
 let preFetchedQuote = null;
 let isFetchingQuote = false;
+
+function clearAllData() {
+    // Clear targeted extension keys
+    localStorage.removeItem('yt_shorts_blocker_history');
+    localStorage.removeItem('yt_shorts_blocker_settings');
+    localStorage.removeItem('yt_break_reminder_settings');
+    
+    // Reset in-memory state
+    const currentDay = getDayKey();
+    allHistory = {
+        [currentDay]: { watchTime: 0, videos: [], sessionStart: Date.now() }
+    };
+    shortsBlockerSettings = { enabled: true };
+    breakSettings = { 
+        enabled: true, 
+        intervalMinutes: 15,
+        workUrl: 'https://www.google.com'
+    };
+    
+    // Trigger immediate UI refresh/save
+    saveHistory();
+    saveShortsBlockerSettings();
+    saveBreakSettings();
+}

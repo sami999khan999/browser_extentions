@@ -20,6 +20,7 @@ const JS_FILES = [
     'shared/state.js',
     'shared/constants.js',
     'shared/utils.js',
+    'shared/modal-utils.js',
 
     // 2. Shorts Blocker domain
     'shorts-blocker/blocker.js',

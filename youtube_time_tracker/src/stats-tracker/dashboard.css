@@ -53,18 +53,19 @@
 /* History Items */
 .history-item {
     display: flex;
-    gap: 12px;
-    padding: 10px 0;
-    margin-bottom: 12px;
+    gap: 16px;
+    padding: 12px 0;
+    margin-bottom: 8px;
     cursor: pointer;
     transition: all 0.2s;
     position: relative;
+    align-items: flex-start;
 }
 
 #video-history-list li.history-item {
     padding: 12px 0;
     display: flex;
-    gap: 12px;
+    gap: 16px;
     align-items: flex-start;
 }
 
@@ -110,10 +111,10 @@
 
 /* Thumbnail */
 .history-thumb {
-    width: 100px;
-    height: 56px;
+    width: 120px;
+    height: 68px;
     object-fit: cover;
-    border-radius: 8px;
+    border-radius: 10px;
     flex-shrink: 0;
     background: var(--stats-thumb-bg);
 }
@@ -128,13 +129,23 @@
     font-size: 13px;
     font-weight: 500;
     line-height: 1.3;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
     color: var(--stats-text-primary);
+}
+
+.video-channel {
+    font-size: 11px;
+    color: var(--stats-text-secondary);
+    margin-bottom: 6px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .video-meta {
