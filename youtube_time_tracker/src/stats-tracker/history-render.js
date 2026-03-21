@@ -59,9 +59,9 @@ function renderStats() {
                 listEl.innerHTML = '<div style="text-align:center; padding: 40px; color:#666;">No activity recorded for this period.</div>';
             } else {
                 listEl.innerHTML = displayVideos.slice().reverse().map(v => {
-                    const percent = v.totalDuration > 0 ? Math.min(100, Math.round((v.watchedDuration / v.totalDuration) * 100)) : 0;
+                    const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
                     return `
-                        <li class="history-item" data-video-id="${v.id}" data-time="${Math.floor(v.watchedDuration)}">
+                        <li class="history-item" data-video-id="${v.id}" data-uid="${v.uid}" data-time="${Math.floor(v.currentPosition || 0)}">
                             <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
                             <div class="history-info">
                                 <div class="video-header-row">
@@ -72,11 +72,16 @@ function renderStats() {
                                     <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
                                 </div>
                                 <div class="video-meta">
-                                    <span class="time-readout">${formatTime(Math.round(v.watchedDuration))} / ${formatTime(Math.round(v.totalDuration))}</span>
-                                    <span class="video-percent">${percent}% watched</span>
+                                    <span class="time-readout">${formatTime(Math.round(v.currentPosition || 0))} / ${formatTime(Math.round(v.totalDuration))}</span>
+                                    <div class="watch-stats">
+                                        <div class="watched-badge">
+                                            <span>${formatTime(Math.round(v.watchedDuration))}</span>
+                                        </div>
+                                        <span class="video-percent">${percent}%</span>
+                                    </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill" style="width: ${percent}%"></div>
+                                    <div class="progress-bar-fill" style="width: ${v.totalDuration > 0 ? Math.min(100, ((v.currentPosition || 0) / v.totalDuration) * 100) : 0}%"></div>
                                 </div>
                             </div>
                         </li>
@@ -97,7 +102,7 @@ function renderStats() {
                     if (delBtn) {
                         delBtn.onclick = (e) => {
                             e.stopPropagation();
-                            const vid = item.dataset.videoId;
+                            const uid = item.dataset.uid;
                             const videoTitle = item.querySelector('.video-title').textContent;
 
                             showConfirmModal({
@@ -108,7 +113,7 @@ function renderStats() {
                                 icon: '🗑️',
                                 onConfirm: () => {
                                     Object.keys(allHistory).forEach(key => {
-                                        allHistory[key].videos = allHistory[key].videos.filter(v => v.id !== vid);
+                                        allHistory[key].videos = allHistory[key].videos.filter(v => v.uid !== uid);
                                     });
                                     saveHistory();
                                     lastVideoCount = -1; // Force rebuild
@@ -119,21 +124,27 @@ function renderStats() {
                     }
                 });
             }
-        } else if (listEl && lastVideoId) {
+        } else if (listEl && currentUid) {
             // Incremental update for the active video
-            const activeItem = listEl.querySelector(`.history-item[data-video-id="${lastVideoId}"]`);
+            const activeItem = listEl.querySelector(`.history-item[data-uid="${currentUid}"]`);
             if (activeItem) {
-                const videoData = displayVideos.find(v => v.id === lastVideoId);
+                const videoData = displayVideos.find(v => v.uid === currentUid);
                 if (videoData) {
                     const timeEl = activeItem.querySelector('.time-readout');
                     const percentEl = activeItem.querySelector('.video-percent');
-                    const progressEl = activeItem.querySelector('.progress-bar-fill');
-                    const percent = videoData.totalDuration > 0 ? Math.min(100, Math.round((videoData.watchedDuration / videoData.totalDuration) * 100)) : 0;
+                    const progressBar = activeItem.querySelector('.progress-bar-fill');
+                    const percent = videoData.totalDuration > 0 ? Math.round((videoData.watchedDuration / videoData.totalDuration) * 100) : 0;
                     
-                    if (timeEl) timeEl.textContent = `${formatTime(Math.round(videoData.watchedDuration))} / ${formatTime(Math.round(videoData.totalDuration))}`;
-                    if (percentEl) percentEl.textContent = `${percent}% watched`;
-                    if (progressEl) progressEl.style.width = `${percent}%`;
-                    activeItem.dataset.time = Math.floor(videoData.watchedDuration);
+                    if (timeEl) timeEl.textContent = `${formatTime(Math.round(videoData.currentPosition || 0))} / ${formatTime(Math.round(videoData.totalDuration))}`;
+                    if (percentEl) {
+                        percentEl.closest('.watch-stats').querySelector('.watched-badge span').textContent = formatTime(Math.round(videoData.watchedDuration));
+                        percentEl.textContent = `${percent}%`;
+                    }
+                    if (progressBar) {
+                        const barPercent = videoData.totalDuration > 0 ? Math.min(100, ((videoData.currentPosition || 0) / videoData.totalDuration) * 100) : 0;
+                        progressBar.style.width = `${barPercent}%`;
+                    }
+                    activeItem.dataset.time = Math.floor(videoData.currentPosition || 0);
                 }
             }
         }

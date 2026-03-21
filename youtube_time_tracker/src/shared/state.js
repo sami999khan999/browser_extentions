@@ -46,6 +46,7 @@ if (!allHistory[todayKey]) {
 let selectedDayFilter = 'today'; // 'today', 'yesterday', 'all', or 'YYYY-MM-DD'
 let activeView = 'history'; // 'history', 'analytics', or 'settings'
 let lastVideoId = '';
+let currentUid = '';
 let lastWatchTimeUpdate = Date.now();
 let isStatsOpen = false;
 let lastRenderedView = '';

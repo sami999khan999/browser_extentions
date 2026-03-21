@@ -21,7 +21,7 @@
     --stats-chart-label: #606060;
     --stats-delete-btn-bg: rgba(0, 0, 0, 0.06);
     --stats-delete-btn-hover: rgba(0, 0, 0, 0.12);
-    --stats-progress-track: rgba(0, 0, 0, 0.08);
+    --stats-progress-track: rgba(0, 0, 0, 0.12);
     --stats-thumb-bg: #e0e0e0;
     --stats-pie-center: #ffffff;
     --stats-body-bg: #ffffff;
@@ -53,7 +53,7 @@ html[dark], [dark] {
     --stats-chart-label: #aaaaaa;
     --stats-delete-btn-bg: rgba(255, 255, 255, 0.1);
     --stats-delete-btn-hover: rgba(255, 255, 255, 0.2);
-    --stats-progress-track: rgba(255, 255, 255, 0.1);
+    --stats-progress-track: rgba(255, 255, 255, 0.15);
     --stats-thumb-bg: #1e1e1e;
     --stats-pie-center: #0f0f0f;
     --stats-body-bg: linear-gradient(to bottom, #0f0f0f, #050505);
