@@ -45,6 +45,9 @@ function blockShorts() {
     // Hide channel tabs using JS (more reliable than CSS for text matching)
     hideShortsTabs();
     
+    // Remove entire Shorts shelves/sections (including headers and "Show more" buttons)
+    hideShortsShelves();
+
     // Reorder sidebar as requested
     reorderSidebar();
 
@@ -100,6 +103,39 @@ function hideShortsTabs() {
         if (link.classList.contains('yt-tab-shape-wiz__tab') || link.closest('tp-yt-paper-tab')) {
              const tab = link.closest('yt-tab-shape') || link.closest('tp-yt-paper-tab') || link;
              tab.style.setProperty('display', 'none', 'important');
+        }
+    });
+}
+
+function hideShortsShelves() {
+    // 1. Find by the specific class identified in the screenshot
+    const gridHosts = document.querySelectorAll('.ytGridShelfViewModelHost');
+    gridHosts.forEach(host => {
+        // If it contains a shorts link or the Shorts icon, hide the whole host
+        if (host.querySelector('a[href*="/shorts/"]') || host.querySelector('yt-icon[type="shorts"]')) {
+            if (host.style.display !== 'none') {
+                host.style.setProperty('display', 'none', 'important');
+            }
+        }
+    });
+
+    // 2. Find by Shorts Icon (more generic)
+    const shortsIcons = document.querySelectorAll('yt-icon[type="shorts"], path[d*="M17.7,3"]');
+    shortsIcons.forEach(icon => {
+        const shelf = icon.closest('ytd-shelf-renderer, ytd-rich-shelf-renderer, ytd-reel-shelf-renderer, ytd-rich-section-renderer, .ytGridShelfViewModelHost');
+        if (shelf && shelf.style.display !== 'none') {
+            shelf.style.setProperty('display', 'none', 'important');
+        }
+    });
+
+    // 3. Find by Header Text "Shorts"
+    const titles = document.querySelectorAll('h2#title, span#title, #title-text');
+    titles.forEach(h => {
+        if (h.textContent.trim().toLowerCase() === 'shorts') {
+             const shelf = h.closest('ytd-shelf-renderer, ytd-rich-shelf-renderer, ytd-reel-shelf-renderer, ytd-rich-section-renderer, .ytGridShelfViewModelHost');
+             if (shelf && shelf.style.display !== 'none') {
+                  shelf.style.setProperty('display', 'none', 'important');
+             }
         }
     });
 }

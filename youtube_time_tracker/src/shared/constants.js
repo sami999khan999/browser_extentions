@@ -17,29 +17,41 @@ ytd-reel-shelf-renderer {
 }
 /* Hiding Shorts in Search Results */
 ytd-reel-shelf-renderer,
-ytd-shelf-renderer:has(ytd-reel-shelf-renderer) {
+ytd-shelf-renderer:has(ytd-reel-shelf-renderer),
+ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+ytd-item-section-renderer:has(ytd-reel-shelf-renderer),
+ytd-item-section-renderer.ytGridShelfViewModelHost:has(a[href*="/shorts/"]),
+ytd-shelf-renderer[is-shorts],
+ytd-rich-shelf-renderer[is-shorts],
+ytd-shelf-renderer:has(yt-icon[type="shorts"]),
+ytd-rich-section-renderer:has(yt-icon[type="shorts"]),
+ytd-shelf-renderer:has(a[href*="/shorts/"]),
+ytd-rich-section-renderer:has(a[href*="/shorts/"]),
+ytd-rich-shelf-renderer:has(a[href*="/shorts/"]) {
     display: none !important;
 }
 /* Hiding individual Shorts videos */
-ytd-video-renderer:has(a[href^="/shorts"]),
-ytd-grid-video-renderer:has(a[href^="/shorts"]),
-ytd-rich-item-renderer:has(a[href^="/shorts"]) {
+ytd-video-renderer:has(a[href*="/shorts/"]),
+ytd-grid-video-renderer:has(a[href*="/shorts/"]),
+ytd-rich-item-renderer:has(a[href*="/shorts/"]),
+ytd-reel-item-renderer,
+ytd-compact-video-renderer:has(a[href*="/shorts/"]) {
     display: none !important;
 }
 /* Hiding Shorts Section in Navigation Drawer */
-ytd-guide-section-renderer:has(a[href="/shorts"]),
-ytd-guide-entry-renderer:has(a[href="/shorts"]) {
+ytd-guide-section-renderer:has(a[href*="/shorts"]),
+ytd-guide-entry-renderer:has(a[href*="/shorts"]) {
     display: none !important;
 }
 /* Hiding Shorts Tab on Channel Pages */
 yt-tab-shape[tab-title="Shorts"],
 .yt-tab-shape-wiz__tab[aria-label="Shorts"],
-a[href$="/shorts"] {
+a[href*="/shorts/"] {
     display: none !important;
 }
 /* Specific fix for sidebar links that might have escaped */
-ytd-guide-entry-renderer a[href="/shorts"],
-ytd-mini-guide-entry-renderer a[href="/shorts"] {
+ytd-guide-entry-renderer a[href*="/shorts"],
+ytd-mini-guide-entry-renderer a[href*="/shorts"] {
     display: none !important;
 }
 `;

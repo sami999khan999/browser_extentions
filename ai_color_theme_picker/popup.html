@@ -36,14 +36,33 @@
                 </div>
                 <div class="auth-box">
                     <div class="field">
+                        <label for="api-key-name">Name</label>
+                        <div class="input-wrapper">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="input-icon"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input type="text" id="api-key-name" placeholder="e.g. Personal, Work...">
+                        </div>
+                    </div>
+                    <div class="field">
                         <label for="api-key">API Key</label>
-                        <input type="password" id="api-key" placeholder="Paste your key here...">
+                        <div class="input-wrapper">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="input-icon"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4a1 1 0 0 0-1.4 0l-2.1 2.1a1 1 0 0 0 0 1.4ZM7 18l-3 3m5-5-7-7c-2 1-2 5 0 7l3 3c2 2 6 2 7 0Z"/></svg>
+                            <input type="password" id="api-key" placeholder="Paste your key here...">
+                        </div>
                     </div>
                     <button id="save-key" class="action-btn primary">
                         <span>Initialize</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
                     </button>
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" class="helper-link">Get a free key →</a>
+                    
+                    <div id="key-list-section" class="key-list-section hidden">
+                        <div class="section-divider">
+                            <span>Saved Keys</span>
+                        </div>
+                        <div id="key-list" class="key-list">
+                            <!-- Keys will be injected here -->
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -68,6 +87,15 @@
                         </div>
                     </button>
                 </div>
+
+                <div id="generating-preview" class="generating-preview hidden">
+                    <div class="preview-header">
+                        <span>AI is crafting your theme...</span>
+                    </div>
+                    <div class="code-stream-wrapper">
+                        <pre id="live-code-stream"></pre>
+                    </div>
+                </div>
             </section>
 
             <!-- View 3: Success -->
@@ -83,17 +111,34 @@
                     <button id="copy-light" class="format-card">
                         <div class="card-head">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-                            <span>Light</span>
+                            <span>Copy Light</span>
                         </div>
                         <code>OKLCH</code>
                     </button>
                     <button id="copy-dark" class="format-card">
                         <div class="card-head">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-                            <span>Dark</span>
+                            <span>Copy Dark</span>
                         </div>
                         <code>OKLCH</code>
                     </button>
+                </div>
+
+                <div class="palette-preview">
+                    <div class="palette-section">
+                        <div class="palette-label">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                            <span>Light Theme Preview</span>
+                        </div>
+                        <div id="light-palette" class="swatch-grid"></div>
+                    </div>
+                    <div class="palette-section">
+                        <div class="palette-label">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                            <span>Dark Theme Preview</span>
+                        </div>
+                        <div id="dark-palette" class="swatch-grid"></div>
+                    </div>
                 </div>
 
                 <button id="copy-full" class="full-export">
