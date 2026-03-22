@@ -34,8 +34,50 @@ document.addEventListener('DOMContentLoaded', () => {
         startOver: document.getElementById('start-over'),
         statusText: document.getElementById('system-status'),
         generatingPreview: document.getElementById('generating-preview'),
-        liveCodeStream: document.getElementById('live-code-stream')
+        liveCodeStream: document.getElementById('live-code-stream'),
     };
+
+    const customDropdown = {
+        container: document.getElementById('custom-dropdown'),
+        header: document.getElementById('dropdown-header'),
+        label: document.getElementById('selected-format-label'),
+        options: document.getElementById('dropdown-options'),
+        items: Array.from(document.querySelectorAll('.option'))
+    };
+
+    let selectedFormatValue = 'oklch';
+
+    // Custom Dropdown Initialization
+    if (customDropdown.header) {
+        customDropdown.header.onclick = (e) => {
+            e.stopPropagation();
+            const isOpen = customDropdown.container.classList.toggle('open');
+            customDropdown.options.classList.toggle('hidden', !isOpen);
+        };
+
+        customDropdown.items.forEach(item => {
+            item.onclick = (e) => {
+                e.stopPropagation();
+                const val = item.getAttribute('data-value');
+                selectedFormatValue = val;
+                customDropdown.label.textContent = item.textContent;
+                
+                customDropdown.items.forEach(opt => opt.classList.remove('active'));
+                item.classList.add('active');
+                
+                customDropdown.container.classList.remove('open');
+                customDropdown.options.classList.add('hidden');
+            };
+        });
+    }
+
+    // Global click listener to close dropdowns
+    window.addEventListener('click', () => {
+        if (customDropdown.container) {
+            customDropdown.container.classList.remove('open');
+            customDropdown.options.classList.add('hidden');
+        }
+    });
 
     const results = {
         copyLight: document.getElementById('copy-light'),
@@ -52,9 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isGenerating = false;
 
     const renderKeyList = () => {
-        console.log('AI Theme Picker: Rendering Key List...', apiKeys);
+
         if (apiKeys.length === 0) {
-            console.log('AI Theme Picker: No keys found.');
+
             keyListEls.section.classList.add('hidden');
             return;
         }
@@ -228,11 +270,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isValidationOrQuota) {
             // console.warn('AI Theme Picker: Notice', msg);
         } else {
-            console.log('AI Theme Picker: Info', error);
+
         }
 
         if (!views.error) {
-            console.log('Notice: Error display element missing!');
+
             return;
         }
 
@@ -268,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load API Keys and perform initial scan
     chrome.storage.local.get(['geminiApiKey', 'apiKeys'], (result) => {
-        console.log('AI Theme Picker: Storage loaded', result);
+
         let rawKeys = result.apiKeys || [];
         // Migration: Convert string keys to objects if necessary
         apiKeys = rawKeys.map(k => {
@@ -367,13 +409,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 target: { tabId: tab.id },
                 func: extractColorsFunc
             });
-            console.log('--- Deep Scan: Detected Colors on Open ---');
-            console.log('Site:', tab.url);
-            console.log('Detected Palette:', pageColors.palette);
-            console.log('Variables:', pageColors.variables);
-            console.log('-----------------------------------------');
+
         } catch (e) {
-            console.log('Initial color scan failed (expected if page is still loading or restricted):', e);
+
         }
     };
 
@@ -463,6 +501,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateStatus('AI is crafting your theme...');
             const stylePrompt = controls.userPrompt.value.trim() || 'modern professional';
+            const selectedFormat = selectedFormatValue.toUpperCase();
+
+            // Update result badges immediately
+            document.querySelectorAll('.format-badge').forEach(b => b.textContent = selectedFormat);
             
             // Format site variables for the prompt if any were found
             const varReference = Object.keys(pageColors.variables).length > 0 
@@ -475,93 +517,97 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '';
 
             const systemPrompt = `You are a professional UI color expert.
+
+### CRITICAL: USER STYLE PREFERENCE (PRIORITY)
+The following styling prompt from the user MUST be prioritized above all else. Study it carefully and ensure the theme reflects this specific request:
+"${stylePrompt}"
+
+### CONTEXT
 Site: ${tab.url} (${tab.title})
-Current Site Colors: Background: ${pageColors.bg}, Text: ${pageColors.text}, Accent/Brand: ${pageColors.accent}${varReference}${paletteReference}
-User Style Preference: ${stylePrompt}
+Analyzed Site Data: Please also analyze the site at ${tab.url} to understand its branding better. Use the extracted data follow: ${varReference}${paletteReference}
 
-Task: Generate a set of Tailwind CSS variables in OKLCH format for both :root (Light) and .dark (Dark) modes.
-The colors must be extremely accurate to the source site's branding while being optimized for high-quality UI design.
+### TASK
+Generate a set of Tailwind CSS variables in ${selectedFormat} format for both :root (Light) and .dark (Dark) modes.
+The colors must be harmonious and modern, reflecting the source site's branding while strictly adhering to the USER STYLE PREFERENCE provided above.
 
-Format Example (ONLY for structure, DO NOT use these specific OKLCH values):
+Format Example (ONLY for structure, DO NOT use these specific values. Use correctly formatted ${selectedFormat} values):
 :root {
   --radius: 0.65rem;
-  --background: oklch(<L> <C> <H>);
-  --foreground: oklch(<L> <C> <H>);
-  --card: oklch(<L> <C> <H>);
-  --card-foreground: oklch(<L> <C> <H>);
-  --popover: oklch(<L> <C> <H>);
-  --popover-foreground: oklch(<L> <C> <H>);
-  --primary: oklch(<L> <C> <H>);
-  --primary-foreground: oklch(<L> <C> <H>);
-  --secondary: oklch(<L> <C> <H>);
-  --secondary-foreground: oklch(<L> <C> <H>);
-  --muted: oklch(<L> <C> <H>);
-  --muted-foreground: oklch(<L> <C> <H>);
-  --accent: oklch(<L> <C> <H>);
-  --accent-foreground: oklch(<L> <C> <H>);
-  --destructive: oklch(<L> <C> <H>);
-  --border: oklch(<L> <C> <H> / <opacity>);
-  --input: oklch(<L> <C> <H> / <opacity>);
-  --ring: oklch(<L> <C> <H>);
-  --chart-1: oklch(<L> <C> <H>);
-  --chart-2: oklch(<L> <C> <H>);
-  --chart-3: oklch(<L> <C> <H>);
-  --chart-4: oklch(<L> <C> <H>);
-  --chart-5: oklch(<L> <C> <H>);
-  --sidebar: oklch(<L> <C> <H>);
-  --sidebar-foreground: oklch(<L> <C> <H>);
-  --sidebar-primary: oklch(<L> <C> <H>);
-  --sidebar-primary-foreground: oklch(<L> <C> <H>);
-  --sidebar-accent: oklch(<L> <C> <H>);
-  --sidebar-accent-foreground: oklch(<L> <C> <H>);
-  --sidebar-border: oklch(<L> <C> <H> / <opacity>);
-  --sidebar-ring: oklch(<L> <C> <H>);
+  --background: <color>;
+  --foreground: <color>;
+  --card: <color>;
+  --card-foreground: <color>;
+  --popover: <color>;
+  --popover-foreground: <color>;
+  --primary: <color>;
+  --primary-foreground: <color>;
+  --secondary: <color>;
+  --secondary-foreground: <color>;
+  --muted: <color>;
+  --muted-foreground: <color>;
+  --accent: <color>;
+  --accent-foreground: <color>;
+  --destructive: <color>;
+  --border: <color> / <opacity>;
+  --input: <color> / <opacity>;
+  --ring: <color>;
+  --chart-1: <color>;
+  --chart-2: <color>;
+  --chart-3: <color>;
+  --chart-4: <color>;
+  --chart-5: <color>;
+  --sidebar: <color>;
+  --sidebar-foreground: <color>;
+  --sidebar-primary: <color>;
+  --sidebar-primary-foreground: <color>;
+  --sidebar-accent: <color>;
+  --sidebar-accent-foreground: <color>;
+  --sidebar-border: <color> / <opacity>;
+  --sidebar-ring: <color>;
 }
 
 .dark {
-  --background: oklch(<L> <C> <H>);
-  --foreground: oklch(<L> <C> <H>);
-  --card: oklch(<L> <C> <H>);
-  --card-foreground: oklch(<L> <C> <H>);
-  --popover: oklch(<L> <C> <H>);
-  --popover-foreground: oklch(<L> <C> <H>);
-  --primary: oklch(<L> <C> <H>);
-  --primary-foreground: oklch(<L> <C> <H>);
-  --secondary: oklch(<L> <C> <H>);
-  --secondary-foreground: oklch(<L> <C> <H>);
-  --muted: oklch(<L> <C> <H>);
-  --muted-foreground: oklch(<L> <C> <H>);
-  --accent: oklch(<L> <C> <H>);
-  --accent-foreground: oklch(<L> <C> <H>);
-  --destructive: oklch(<L> <C> <H>);
-  --border: oklch(<L> <C> <H> / <opacity>);
-  --input: oklch(<L> <C> <H> / <opacity>);
-  --ring: oklch(<L> <C> <H>);
-  --chart-1: oklch(<L> <C> <H>);
-  --chart-2: oklch(<L> <C> <H>);
-  --chart-3: oklch(<L> <C> <H>);
-  --chart-4: oklch(<L> <C> <H>);
-  --chart-5: oklch(<L> <C> <H>);
-  --sidebar: oklch(<L> <C> <H>);
-  --sidebar-foreground: oklch(<L> <C> <H>);
-  --sidebar-primary: oklch(<L> <C> <H>);
-  --sidebar-primary-foreground: oklch(<L> <C> <H>);
-  --sidebar-accent: oklch(<L> <C> <H>);
-  --sidebar-accent-foreground: oklch(<L> <C> <H>);
-  --sidebar-border: oklch(<L> <C> <H> / <opacity>);
-  --sidebar-ring: oklch(<L> <C> <H>);
+  --background: <color>;
+  --foreground: <color>;
+  --card: <color>;
+  --card-foreground: <color>;
+  --popover: <color>;
+  --popover-foreground: <color>;
+  --primary: <color>;
+  --primary-foreground: <color>;
+  --secondary: <color>;
+  --secondary-foreground: <color>;
+  --muted: <color>;
+  --muted-foreground: <color>;
+  --accent: <color>;
+  --accent-foreground: <color>;
+  --destructive: <color>;
+  --border: <color> / <opacity>;
+  --input: <color> / <opacity>;
+  --ring: <color>;
+  --chart-1: <color>;
+  --chart-2: <color>;
+  --chart-3: <color>;
+  --chart-4: <color>;
+  --chart-5: <color>;
+  --sidebar: <color>;
+  --sidebar-foreground: <color>;
+  --sidebar-primary: <color>;
+  --sidebar-primary-foreground: <color>;
+  --sidebar-accent: <color>;
+  --sidebar-accent-foreground: <color>;
+  --sidebar-border: <color> / <opacity>;
+  --sidebar-ring: <color>;
 }
 
 Rules:
-1. CRITICAL: Use the "Current Site Colors" provided above to derive all variables. Do NOT use the example values.
-2. Use OKLCH format exactly as shown. 
-3. Output ONLY the raw CSS. No code blocks, no explanations.`;
+1. CRITICAL: Prioritize the "USER STYLE PREFERENCE" at the top.
+2. Output ALL variables as FULLY WRAPPED, VALID CSS color values (e.g., oklch(L C H), rgb(R G B), hsl(H S L), etc.).
+3. DO NOT output raw numbers without the color function (e.g., DO NOT use --primary: 44 132 219; instead use --primary: rgb(44, 132, 219);).
+4. Output ONLY the raw CSS. No code blocks, no explanations.`;
 
             const requestBody = { contents: [{ parts: [{ text: systemPrompt }] }] };
-            console.log('--- AI Request Data ---');
-            console.log('Full AI System Prompt:', systemPrompt);
-            console.log('Final Site Colors Summary:', pageColors);
-            console.log('-----------------------');
+            console.log("--- FINAL AI PROMPT ---", systemPrompt);
 
             controls.generatingPreview.classList.remove('hidden');
             controls.liveCodeStream.textContent = '';
@@ -628,7 +674,7 @@ Rules:
                                         controls.liveCodeStream.parentElement.scrollTop = controls.liveCodeStream.parentElement.scrollHeight;
                                     }
                                 } catch (e) {
-                                    console.log('AI Theme Picker: Chunk skip (invalid JSON):', e);
+
                                 }
                                 buffer = buffer.substring(j);
                                 i = 0;
@@ -645,7 +691,8 @@ Rules:
             }
 
             const aiText = fullText.replace(/```css|```/g, '').trim();
-            console.log('AI Theme Picker: Full generated text:', aiText);
+            console.log("--- AI RESPONSE DATA ---", aiText);
+
 
             const lightMatch = aiText.match(/:root\s*{([\s\S]+?)}/);
             const darkMatch = aiText.match(/\.dark\s*{([\s\S]+?)}/);
@@ -660,7 +707,7 @@ Rules:
                 showView('result');
                 updateStatus('Theme generated');
             } else {
-                console.log('AI Theme Picker: Parsing issue. AI Text Snapshot:', aiText.slice(0, 500));
+
                 throw new Error("I received the theme data but couldn't parse the CSS colors. Please try a different prompt or check the console.");
             }
         } catch (err) {
@@ -688,7 +735,14 @@ Rules:
             
             const box = document.createElement('div');
             box.className = 'swatch-box';
-            box.style.backgroundColor = value;
+            
+            let finalValue = value.trim();
+            // Safety: If the AI outputs raw numbers (e.g., "73 73 70"), wrap it in the current format
+            if (/^[\d.\s,%/]+$/.test(finalValue) && !finalValue.includes('(')) {
+                finalValue = `${selectedFormatValue.toLowerCase()}(${finalValue})`;
+            }
+            
+            box.style.backgroundColor = finalValue;
             
             const label = document.createElement('span');
             label.className = 'swatch-name';
@@ -725,13 +779,13 @@ Rules:
 
     // Global Error Handling to prevent "breaking errors"
     window.onerror = (message, source, lineno, colno, error) => {
-        console.log('AI Theme Picker: Warning Notice', { message, source, lineno, colno, error });
+
         showError(error || new Error(message));
         return true; 
     };
 
     window.onunhandledrejection = (event) => {
-        console.log('AI Theme Picker: Unhandled Rejection', event.reason);
+
         showError(event.reason instanceof Error ? event.reason : new Error(String(event.reason)));
     };
 });

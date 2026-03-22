@@ -76,6 +76,27 @@
                         <span class="hint">Shift + Enter to generate</span>
                     </div>
                     <textarea id="user-prompt" placeholder="Modern SaaS dashboard with slate colors..."></textarea>
+                    
+                    <div class="format-selector-wrapper">
+                        <label>Color Format</label>
+                        <div id="custom-dropdown" class="custom-dropdown">
+                            <div id="dropdown-header" class="dropdown-header">
+                                <div class="header-main">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
+                                    <span id="selected-format-label">OKLCH (Modern)</span>
+                                </div>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chevron"><path d="m6 9 6 6 6-6"/></svg>
+                            </div>
+                            <div id="dropdown-options" class="dropdown-options hidden">
+                                <div class="option active" data-value="oklch">OKLCH (Modern)</div>
+                                <div class="option" data-value="hex">HEX</div>
+                                <div class="option" data-value="rgb">RGB</div>
+                                <div class="option" data-value="hsl">HSL</div>
+                                <div class="option" data-value="lch">LCH</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <button id="generate-btn" class="generate-trigger">
                         <div id="btn-content">
                             <span>Generate Theme</span>
@@ -113,14 +134,14 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                             <span>Copy Light</span>
                         </div>
-                        <code>OKLCH</code>
+                        <code class="format-badge">OKLCH</code>
                     </button>
                     <button id="copy-dark" class="format-card">
                         <div class="card-head">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                             <span>Copy Dark</span>
                         </div>
-                        <code>OKLCH</code>
+                        <code class="format-badge">OKLCH</code>
                     </button>
                 </div>
 

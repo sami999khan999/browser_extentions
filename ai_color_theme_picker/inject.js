@@ -1,6 +1,6 @@
 // inject.js - Runs in the page's execution context to access window.ai
 (async function() {
-    console.log('Color Theme Picker: inject.js loaded and listening');
+
     
     window.addEventListener('message', async (event) => {
         if (event.source !== window || !event.data || event.data.type !== 'FROM_CONTENT_SCRIPT') {
@@ -8,7 +8,7 @@
         }
 
         const { action, payload } = event.data;
-        console.log('Color Theme Picker (Page): Received action', action);
+
 
         if (action === 'CALL_AI') {
             try {
@@ -21,14 +21,14 @@
                     throw new Error('window.ai detected but languageModel/createTextSession is missing.');
                 }
 
-                console.log('Color Theme Picker (Page): Creating AI session...');
+
                 const model = await (window.ai.languageModel ? window.ai.languageModel.create({
                     systemPrompt: "You are a Shadcn UI theme expert. Output ONLY raw CSS for :root and .dark modes using OKLCH colors. Do not explain. Do not use code blocks."
                 }) : window.ai.createTextSession());
 
-                console.log('Color Theme Picker (Page): Prompting AI...');
+
                 const response = await model.prompt(payload.prompt);
-                console.log('Color Theme Picker (Page): AI Response received');
+
                 
                 window.postMessage({ 
                     type: 'FROM_PAGE_CONTEXT', 
