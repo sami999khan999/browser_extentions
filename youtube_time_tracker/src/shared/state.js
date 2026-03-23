@@ -57,7 +57,10 @@ async function initState() {
                     const localBreak = localStorage.getItem('ytt_break_settings');
                     if (localBreak) bSettings = JSON.parse(localBreak);
 
-                    // Mark as migrated
+                    // Mark as migrated and cleanup old keys
+                    localStorage.removeItem('ytt_history');
+                    localStorage.removeItem('ytt_shorts_settings');
+                    localStorage.removeItem('ytt_break_settings');
                     storage.local.set({ ytt_migrated: true });
                 } catch (e) {
                     console.error('Migration failed:', e);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Time Tracker",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Take control of your YouTube experience. Track watch time, analyze viewing habits, and stay focused with an integrated Shorts blocker and intelligent break reminders.",
   "icons": {
     "16": "icons/icon128.jpg",

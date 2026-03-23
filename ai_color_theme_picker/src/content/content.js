@@ -3,7 +3,7 @@
 function injectScript() {
 
     const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('inject.js');
+    script.src = chrome.runtime.getURL('src/content/inject.js');
     script.onload = () => {
 
         script.remove();

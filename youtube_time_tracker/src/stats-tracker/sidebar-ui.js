@@ -1,4 +1,5 @@
 // === Stats Sidebar UI: Toggle button, sidebar creation, drag & resize ===
+const SCROLLBAR_PADDING = 30;
 
 function injectStatsUI() {
     if (!document.body) return;
@@ -12,84 +13,93 @@ function injectStatsUI() {
         document.body.appendChild(tooltip);
     }
 
-    // Toggle Button
-    const btn = document.createElement('div');
-    btn.id = 'stats-toggle-btn';
-    btn.innerHTML = `
-        ${icons.stats_toggle}
-        <span id="stats-timer-badge" class="stats-timer-badge" style="display: none;"></span>
-    `;
-    btn.title = 'YouTube Stats Tracker (Drag to Move)';
-    
-    // Position Persistence & Constraints
-    const constrainBtnToViewport = (savedPos) => {
-        const padding = 10;
-        const scrollbarPadding = 30;
-        const rect = btn.getBoundingClientRect();
-        
-        // Use rect dimensions if available, otherwise fallback to CSS defaults
-        const btnWidth = rect.width || 48;
-        const btnHeight = rect.height || 48;
-        
-        let { top, left, snapped } = savedPos || {};
-        
-        // Default values if missing
-        if (top === undefined) top = '80px';
-        if (left === undefined) left = '10px';
+    // Load position first to avoid "jump" during navigation
+    storage.local.get('ytt_toggle_pos', (data) => {
+        if (document.getElementById('stats-toggle-btn')) return;
 
-        // Convert to numbers for calculation
-        let topNum = parseInt(top, 10);
-        let leftNum = parseInt(left, 10);
-        
-        if (isNaN(topNum)) topNum = 80;
-        if (isNaN(leftNum)) leftNum = 10;
+        // Toggle Button
+        const btn = document.createElement('div');
+        btn.id = 'stats-toggle-btn';
+        btn.innerHTML = `
+            ${icons.stats_toggle}
+            <span id="stats-timer-badge" class="stats-timer-badge" style="display: none;"></span>
+        `;
+        btn.title = 'YouTube Stats Tracker (Drag to Move)';
 
-        // Vertical Boundary - Ensure we stay within window.innerHeight
-        const maxTop = window.innerHeight - btnHeight - padding;
-        topNum = Math.max(padding, Math.min(maxTop, topNum));
-        
-        // Horizontal Snapping based on saved state or current center
-        if (snapped === 'right' || (!snapped && leftNum + btnWidth / 2 > window.innerWidth / 2)) {
-            leftNum = window.innerWidth - btnWidth - scrollbarPadding;
-            snapped = 'right';
-        } else {
-            leftNum = padding;
-            snapped = 'left';
+        const savedPos = data.ytt_toggle_pos || null;
+
+        // Apply saved position BEFORE appending to DOM to prevent flash
+        applyPosition(btn, savedPos);
+        document.body.appendChild(btn);
+
+        // Events and initialization
+        setupSidebarLogic(btn);
+    });
+}
+
+/**
+ * Applies position to the button. Always uses `left` for horizontal
+ * placement so the CSS spring transition works correctly.
+ */
+function applyPosition(btn, savedPos) {
+    const padding = 10;
+    const btnSize = 54; // matches CSS width/height
+
+    let { top, snapped } = savedPos || {};
+
+    // Default values
+    let topNum = parseInt(top, 10);
+    if (isNaN(topNum)) topNum = 80;
+
+    // Vertical boundary
+    const maxTop = window.innerHeight - btnSize - padding;
+    topNum = Math.max(padding, Math.min(maxTop, topNum));
+
+    // Horizontal: always use `left` so CSS transition animates the spring
+    let leftNum;
+    if (snapped === 'right') {
+        leftNum = window.innerWidth - btnSize - SCROLLBAR_PADDING;
+    } else {
+        leftNum = padding;
+        snapped = 'left';
+    }
+
+    btn.style.top = topNum + 'px';
+    btn.style.left = leftNum + 'px';
+    btn.style.bottom = 'auto';
+    btn.style.right = 'auto';
+
+    return { top: topNum, snapped };
+}
+
+function setupSidebarLogic(btn) {
+    const dragStatus = { isDragging: false };
+    let currentSnapped = 'right'; // default
+
+    // Read initial snapped state from storage
+    storage.local.get('ytt_toggle_pos', (data) => {
+        if (data.ytt_toggle_pos && data.ytt_toggle_pos.snapped) {
+            currentSnapped = data.ytt_toggle_pos.snapped;
         }
+    });
 
-        btn.style.top = topNum + 'px';
-        btn.style.left = leftNum + 'px';
-        btn.style.bottom = 'auto';
-        btn.style.right = 'auto';
-
-        // Save corrected position
-        storage.local.set({ ytt_toggle_pos: {
-            top: btn.style.top,
-            left: btn.style.left,
-            snapped: snapped
-        }});
+    // On resize/fullscreen: re-read saved position from storage then re-apply
+    const handleViewportChange = () => {
+        storage.local.get('ytt_toggle_pos', (data) => {
+            const result = applyPosition(btn, data.ytt_toggle_pos || null);
+            currentSnapped = result.snapped;
+        });
     };
 
-    document.body.appendChild(btn);
-
-    // Initial constraint - load position from storage first
-    setTimeout(() => {
-        storage.local.get('ytt_toggle_pos', (data) => {
-            constrainBtnToViewport(data.ytt_toggle_pos || null);
-        });
-    }, 50);
-    
     let resizeTimer;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => constrainBtnToViewport(), 150);
+        resizeTimer = setTimeout(handleViewportChange, 150);
     });
-    
-    document.addEventListener('fullscreenchange', () => constrainBtnToViewport());
-    document.addEventListener('webkitfullscreenchange', () => constrainBtnToViewport());
 
-    // Draggable Logic
-    const dragStatus = { isDragging: false };
+    document.addEventListener('fullscreenchange', handleViewportChange);
+    document.addEventListener('webkitfullscreenchange', handleViewportChange);
+
     let startX, startY, btnStartX, btnStartY;
 
     btn.onmousedown = (e) => {
@@ -130,26 +140,26 @@ function injectStatsUI() {
             if (dragStatus.isDragging) {
                 btn.classList.remove('dragging');
                 
-                // Springy Edge Snapping with Scrollbar Awareness
+                // Springy Edge Snapping — uses `left` so the CSS transition animates
                 const rect = btn.getBoundingClientRect();
                 const centerX = rect.left + rect.width / 2;
                 const padding = 10;
-                const scrollbarPadding = 30; // Extra room for YouTube scrollbar
-                let snapped = 'left';
+                let snapped;
                 
                 if (centerX < window.innerWidth / 2) {
                     btn.style.left = padding + 'px';
                     snapped = 'left';
                 } else {
-                    btn.style.left = (window.innerWidth - rect.width - scrollbarPadding) + 'px';
+                    btn.style.left = (window.innerWidth - rect.width - SCROLLBAR_PADDING) + 'px';
                     snapped = 'right';
                 }
                 
+                currentSnapped = snapped;
+
                 // Save state
                 setTimeout(() => {
                     storage.local.set({ ytt_toggle_pos: {
                         top: btn.style.top,
-                        left: btn.style.left,
                         snapped: snapped
                     }});
                     // Reset dragging status AFTER the click event has a chance to fire
