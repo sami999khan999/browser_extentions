@@ -21,17 +21,72 @@ function injectStatsUI() {
     `;
     btn.title = 'YouTube Stats Tracker (Drag to Move)';
     
-    // Position Persistence
-    const savedPos = localStorage.getItem('ytt_toggle_pos');
-    if (savedPos) {
-        const { top, left } = JSON.parse(savedPos);
-        btn.style.top = top;
-        btn.style.left = left;
+    // Position Persistence & Constraints
+    const constrainBtnToViewport = (savedPos) => {
+        const padding = 10;
+        const scrollbarPadding = 30;
+        const rect = btn.getBoundingClientRect();
+        
+        // Use rect dimensions if available, otherwise fallback to CSS defaults
+        const btnWidth = rect.width || 48;
+        const btnHeight = rect.height || 48;
+        
+        let { top, left, snapped } = savedPos || {};
+        
+        // Default values if missing
+        if (top === undefined) top = '80px';
+        if (left === undefined) left = '10px';
+
+        // Convert to numbers for calculation
+        let topNum = parseInt(top, 10);
+        let leftNum = parseInt(left, 10);
+        
+        if (isNaN(topNum)) topNum = 80;
+        if (isNaN(leftNum)) leftNum = 10;
+
+        // Vertical Boundary - Ensure we stay within window.innerHeight
+        const maxTop = window.innerHeight - btnHeight - padding;
+        topNum = Math.max(padding, Math.min(maxTop, topNum));
+        
+        // Horizontal Snapping based on saved state or current center
+        if (snapped === 'right' || (!snapped && leftNum + btnWidth / 2 > window.innerWidth / 2)) {
+            leftNum = window.innerWidth - btnWidth - scrollbarPadding;
+            snapped = 'right';
+        } else {
+            leftNum = padding;
+            snapped = 'left';
+        }
+
+        btn.style.top = topNum + 'px';
+        btn.style.left = leftNum + 'px';
         btn.style.bottom = 'auto';
         btn.style.right = 'auto';
-    }
-    
+
+        // Save corrected position
+        storage.local.set({ ytt_toggle_pos: {
+            top: btn.style.top,
+            left: btn.style.left,
+            snapped: snapped
+        }});
+    };
+
     document.body.appendChild(btn);
+
+    // Initial constraint - load position from storage first
+    setTimeout(() => {
+        storage.local.get('ytt_toggle_pos', (data) => {
+            constrainBtnToViewport(data.ytt_toggle_pos || null);
+        });
+    }, 50);
+    
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => constrainBtnToViewport(), 150);
+    });
+    
+    document.addEventListener('fullscreenchange', () => constrainBtnToViewport());
+    document.addEventListener('webkitfullscreenchange', () => constrainBtnToViewport());
 
     // Draggable Logic
     const dragStatus = { isDragging: false };
@@ -80,19 +135,23 @@ function injectStatsUI() {
                 const centerX = rect.left + rect.width / 2;
                 const padding = 10;
                 const scrollbarPadding = 30; // Extra room for YouTube scrollbar
+                let snapped = 'left';
                 
                 if (centerX < window.innerWidth / 2) {
                     btn.style.left = padding + 'px';
+                    snapped = 'left';
                 } else {
                     btn.style.left = (window.innerWidth - rect.width - scrollbarPadding) + 'px';
+                    snapped = 'right';
                 }
                 
                 // Save state
                 setTimeout(() => {
-                    localStorage.setItem('ytt_toggle_pos', JSON.stringify({
+                    storage.local.set({ ytt_toggle_pos: {
                         top: btn.style.top,
-                        left: btn.style.left
-                    }));
+                        left: btn.style.left,
+                        snapped: snapped
+                    }});
                     // Reset dragging status AFTER the click event has a chance to fire
                     dragStatus.isDragging = false;
                 }, 200);
@@ -107,11 +166,12 @@ function injectStatsUI() {
     const sidebar = document.createElement('div');
     sidebar.id = 'stats-sidebar';
     
-    // Load and Apply Persisted Width
-    const savedWidth = localStorage.getItem('ytt_sidebar_width');
-    if (savedWidth) {
-        sidebar.style.width = savedWidth + 'px';
-    }
+    // Load and Apply Persisted Width from storage
+    storage.local.get('ytt_sidebar_width', (data) => {
+        if (data.ytt_sidebar_width) {
+            sidebar.style.width = data.ytt_sidebar_width + 'px';
+        }
+    });
 
     // Add Resizer Handle
     const resizer = document.createElement('div');
@@ -146,7 +206,7 @@ function injectStatsUI() {
             document.body.classList.remove('yt-shorts-resizing-active');
             sidebar.classList.remove('resizing');
             resizer.classList.add('active');
-            localStorage.setItem('ytt_sidebar_width', parseInt(sidebar.style.width, 10));
+            storage.local.set({ ytt_sidebar_width: parseInt(sidebar.style.width, 10) });
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
         };

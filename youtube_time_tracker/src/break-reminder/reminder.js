@@ -2,7 +2,7 @@
 
 async function fetchZenQuote() {
     return new Promise((resolve) => {
-        chrome.runtime.sendMessage({ action: 'FETCH_QUOTE' }, (response) => {
+        safeSendMessage({ action: 'FETCH_QUOTE' }, (response) => {
             if (response && response.text) {
                 resolve(response);
             } else {

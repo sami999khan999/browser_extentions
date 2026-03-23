@@ -60,8 +60,9 @@ function renderStats() {
             } else {
                 listEl.innerHTML = displayVideos.slice().reverse().map(v => {
                     const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
+                    const isActive = v.uid === currentUid;
                     return `
-                        <li class="history-item" data-video-id="${v.id}" data-uid="${v.uid}" data-time="${Math.floor(v.currentPosition || 0)}">
+                        <li class="history-item ${isActive ? 'active-tab-video' : ''}" data-video-id="${v.id}" data-uid="${v.uid}" data-time="${Math.floor(v.currentPosition || 0)}">
                             <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
                             <div class="history-info">
                                 <div class="video-header-row">
@@ -124,15 +125,18 @@ function renderStats() {
                     }
                 });
             }
-        } else if (listEl && currentUid) {
-            // Incremental update for the active video
-            const activeItem = listEl.querySelector(`.history-item[data-uid="${currentUid}"]`);
-            if (activeItem) {
-                const videoData = displayVideos.find(v => v.uid === currentUid);
-                if (videoData) {
-                    const timeEl = activeItem.querySelector('.time-readout');
-                    const percentEl = activeItem.querySelector('.video-percent');
-                    const progressBar = activeItem.querySelector('.progress-bar-fill');
+        } else if (listEl) {
+            // Incremental update for ALL videos (multi-tab sync)
+            displayVideos.forEach(videoData => {
+                const item = listEl.querySelector(`.history-item[data-uid="${videoData.uid}"]`);
+                if (item) {
+                    // Update highlighting if it changed
+                    const isActive = videoData.uid === currentUid;
+                    item.classList.toggle('active-tab-video', isActive);
+
+                    const timeEl = item.querySelector('.time-readout');
+                    const percentEl = item.querySelector('.video-percent');
+                    const progressBar = item.querySelector('.progress-bar-fill');
                     const percent = videoData.totalDuration > 0 ? Math.round((videoData.watchedDuration / videoData.totalDuration) * 100) : 0;
                     
                     if (timeEl) timeEl.textContent = `${formatTime(Math.round(videoData.currentPosition || 0))} / ${formatTime(Math.round(videoData.totalDuration))}`;
@@ -144,9 +148,9 @@ function renderStats() {
                         const barPercent = videoData.totalDuration > 0 ? Math.min(100, ((videoData.currentPosition || 0) / videoData.totalDuration) * 100) : 0;
                         progressBar.style.width = `${barPercent}%`;
                     }
-                    activeItem.dataset.time = Math.floor(videoData.currentPosition || 0);
+                    item.dataset.time = Math.floor(videoData.currentPosition || 0);
                 }
-            }
+            });
         }
     } else {
         if (activeView !== lastRenderedView) {

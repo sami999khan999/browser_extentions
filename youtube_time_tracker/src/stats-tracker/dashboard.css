@@ -54,12 +54,22 @@
 .history-item {
     display: flex;
     gap: 16px;
-    padding: 12px 0;
+    padding: 12px 12px;
     margin-bottom: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     align-items: flex-start;
+    border-radius: 12px;
+    border: 1px solid transparent;
+}
+
+.history-item.active-tab-video {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Subtle lift */
+}
+
+.history-item.active-tab-video .video-title {
+    color: var(--stats-primary) !important;
 }
 
 #video-history-list li.history-item {

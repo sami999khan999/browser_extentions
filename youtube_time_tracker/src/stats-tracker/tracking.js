@@ -1,6 +1,8 @@
 // === Stats Tracking: Video watch time recording ===
 
 function updateStats() {
+    if (window.yttContextInvalidated) return;
+    
     const now = Date.now();
     const delta = (now - lastWatchTimeUpdate) / 1000;
     lastWatchTimeUpdate = now;
@@ -30,13 +32,11 @@ function updateStats() {
             }
             
             const videoTitleEl = document.querySelector('h1.ytd-watch-metadata') || 
-                                 document.querySelector('.ytd-video-primary-info-renderer h1.title') ||
-                                 document.querySelector('h1.title.ytd-video-primary-info-renderer');
+                                 document.querySelector('.ytd-video-primary-info-renderer h1.title');
             const title = videoTitleEl ? videoTitleEl.textContent.trim() : 'Loading Video...';
             
             const channelNameEl = document.querySelector('#upload-info #channel-name a') || 
-                                  document.querySelector('ytd-video-owner-renderer #channel-name a') ||
-                                  document.querySelector('#owner-sub-count');
+                                   document.querySelector('ytd-video-owner-renderer #channel-name a');
             const channelName = channelNameEl ? channelNameEl.textContent.trim() : 'Loading Channel...';
 
             if (!todayData.videos.find(v => v.uid === currentUid)) {
@@ -72,15 +72,32 @@ function updateStats() {
             }
 
             // Track current position specifically for the progress bar.
-            // Guard: don't clobber with 0 when the video is resetting, buffering, or loading.
             if (video.currentTime > 0 || (!video.paused && video.readyState >= 2)) {
                 activeVideo.currentPosition = video.currentTime;
             }
 
-            // Only count time when video is actually playing
+            // Report time and video state to background for atomic update
             if (!video.paused && !video.ended && video.readyState >= 2) {
-                activeVideo.watchedDuration += delta;
-                todayData.watchTime += delta;
+                safeSendMessage({
+                    action: 'REPORT_WATCH_TIME',
+                    delta: delta,
+                    videoId: videoId,
+                    videoTitle: activeVideo.title,
+                    channelName: activeVideo.channelName,
+                    currentPosition: video.currentTime,
+                    totalDuration: video.duration
+                });
+            } else {
+                // Just sync position/state if not playing
+                safeSendMessage({
+                    action: 'REPORT_WATCH_TIME',
+                    delta: 0,
+                    videoId: videoId,
+                    videoTitle: activeVideo.title,
+                    channelName: activeVideo.channelName,
+                    currentPosition: video.currentTime,
+                    totalDuration: video.duration
+                });
             }
         }
     }
@@ -88,6 +105,4 @@ function updateStats() {
     if (isStatsOpen) {
         renderStats();
     }
-    
-    saveHistory();
 }
