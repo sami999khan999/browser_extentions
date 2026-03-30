@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Quick Sentence Copy",
+  "version": "1.0",
+  "description": "Copy the full sentence under your cursor with Alt + Click.",
+  "permissions": [
+    "clipboardWrite",
+    "contextMenus",
+    "activeTab",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "css": ["src/content/styles.css"]
+    }
+  ]
+}

@@ -1,20 +1,20 @@
 :root {
   --bg: #09090b;
   --fg: #fafafa;
-  --primary: #18181b;
+  --primary: #41668F;
   --secondary: #27272a;
   --muted: #a1a1aa;
   --border: rgba(255, 255, 255, 0.08);
-  --accent: #8b5cf6;
-  --accent-soft: rgba(139, 92, 246, 0.15);
+  --accent: #41668F;
+  --accent-soft: rgba(65, 102, 143, 0.15);
   --accent-foreground: #ffffff;
   --secondary: #18181b;
   --secondary-fg: #f4f4f5;
   --error: #ef4444;
   --warning: #f59e0b;
   --success: #10b981;
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 4px;
+  --radius-sm: 2px;
   --glass: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -38,7 +38,7 @@ body {
   transform: translateX(-50%);
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0) 70%);
+  background: radial-gradient(circle, rgba(65, 102, 143, 0.15) 0%, rgba(65, 102, 143, 0) 70%);
   filter: blur(60px);
   z-index: -1;
   pointer-events: none;
@@ -73,12 +73,12 @@ body {
 }
 
 .logo-shield {
-  background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #2d4a6b 100%);
   color: white;
   padding: 6px;
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(65, 102, 143, 0.3);
 }
 
 .brand-text h1 {
@@ -184,7 +184,7 @@ input:hover {
 input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 0 2px rgba(65, 102, 143, 0.2);
 }
 
 input:focus + .input-icon, 
@@ -210,17 +210,17 @@ input.error-input {
   gap: 8px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(65, 102, 143, 0.3);
 }
 
 .action-btn:hover { 
-  background: #7c3aed; 
+  background: #365578; 
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 6px 16px rgba(65, 102, 143, 0.4);
 }
 
 .action-btn.primary {
-  background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #2d4a6b 100%);
   position: relative;
   overflow: hidden;
 }
@@ -257,7 +257,7 @@ input.error-input {
   background: var(--secondary);
   border: 1px solid var(--border);
   padding: 12px;
-  border-radius: 12px;
+  border-radius: 4px;
 }
 
 .editor-header { display: flex; justify-content: space-between; align-items: center; }
@@ -588,7 +588,7 @@ code { font-size: 0.65rem; color: var(--muted); background: var(--bg); padding: 
 .key-item {
   background: var(--secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 10px 14px;
   display: flex;
   justify-content: space-between;
@@ -599,14 +599,14 @@ code { font-size: 0.65rem; color: var(--muted); background: var(--bg); padding: 
 }
 
 .key-item:hover {
-  border-color: rgba(139, 92, 246, 0.5);
+  border-color: rgba(65, 102, 143, 0.5);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .key-item.active {
   border-color: var(--accent);
-  background: rgba(139, 92, 246, 0.08);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+  background: rgba(65, 102, 143, 0.08);
+  box-shadow: 0 4px 12px rgba(65, 102, 143, 0.15);
 }
 
 .key-item.active::before {
@@ -746,14 +746,14 @@ code { font-size: 0.65rem; color: var(--muted); background: var(--bg); padding: 
 }
 
 .dropdown-header:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  background: rgba(139, 92, 246, 0.05);
-  box-shadow: 0 0 12px rgba(139, 92, 246, 0.1);
+  border-color: rgba(65, 102, 143, 0.5);
+  background: rgba(65, 102, 143, 0.05);
+  box-shadow: 0 0 12px rgba(65, 102, 143, 0.1);
 }
 
 .custom-dropdown.open .dropdown-header {
   border-color: var(--accent);
-  background: rgba(139, 92, 246, 0.08); /* accent-soft but more subtle */
+  background: rgba(65, 102, 143, 0.08); /* accent-soft but more subtle */
 }
 
 .dropdown-header .chevron {
