@@ -18,6 +18,13 @@ A curated collection of premium, developer-focused Chrome extensions designed to
 - Features a smart break reminder system with focus-trapped intervention modals.
 - Premium, accessibility-first interface with draggable/resizable sidebar.
 
+### 3. [Quick Copy](file:///e:/browser_extentions/quick_copy)
+**Instantaneous Sentence and Word Extraction**
+- Features full sentence extraction with intelligent boundary detection.
+- Includes word-level extraction for precise control (1 Word, 2 Words, N Words).
+- Fully customizable shortcuts supporting mouse buttons and modifier keys.
+- Premium, accessibility-first toast notifications for instant visual feedback.
+
 ---
 
 ## 🛠 Development & Installation

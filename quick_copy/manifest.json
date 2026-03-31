@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Quick Sentence Copy",
+  "name": "Quick Copy",
   "version": "1.0",
-  "description": "Copy the full sentence under your cursor with Alt + Click.",
+  "description": "Copy sentences and words under your cursor instantly with customizable shortcuts.",
   "permissions": [
     "clipboardWrite",
     "contextMenus",
