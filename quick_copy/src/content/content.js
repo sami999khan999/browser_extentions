@@ -16,6 +16,7 @@
 
   let currentSettings = JSON.parse(JSON.stringify(DEFAULTS));
   let mousePos = { x: 0, y: 0 };
+  let activeKeys = new Set();
 
   function loadSettings() {
     chrome.storage.sync.get(['wordCount', 'shortcuts'], (result) => {
@@ -145,12 +146,16 @@
   function matchShortcut(e, action, triggerType) {
     const mapping = currentSettings.shortcuts[action];
     if (!mapping) return false;
-    
+
     let triggerMatch = false;
-    if (triggerType === 'CLICK' && mapping.trigger === 'CLICK') {
-      triggerMatch = (e.button === mapping.button);
-    } else if (triggerType === 'KEY' && mapping.trigger === e.code) {
-      triggerMatch = true;
+    if (triggerType === 'CLICK') {
+      if (mapping.trigger === 'CLICK') {
+        // Enforce Left Click (button 0) for standard CLICK triggers
+        triggerMatch = (e.button === 0);
+      } else if (activeKeys.has(mapping.trigger)) {
+        // Enforce Left Click (button 0) for KEY-based triggers
+        triggerMatch = (e.button === 0);
+      }
     }
 
     return (
@@ -267,9 +272,16 @@
   }, { capture: true });
 
   window.addEventListener('keydown', (e) => {
-    const action = getMatchedAction(e, 'KEY');
-    if (action) handleAction(e, action);
+    activeKeys.add(e.code);
   }, { capture: true });
+
+  window.addEventListener('keyup', (e) => {
+    activeKeys.delete(e.code);
+  }, { capture: true });
+
+  window.addEventListener('blur', () => {
+    activeKeys.clear();
+  });
 
   loadSettings();
   console.log("Quick Sentence Copy (Multi-Button) initialized.");

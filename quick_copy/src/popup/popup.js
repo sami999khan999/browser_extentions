@@ -1,163 +1,194 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const wordCountInput = document.getElementById('wordCount');
-  const resetButton = document.getElementById('resetDefaults');
-  const shortcutItems = document.querySelectorAll('.shortcut-item');
-  const globalHint = document.getElementById('global-hint');
+document.addEventListener("DOMContentLoaded", () => {
+  const wordCountInput = document.getElementById("wordCount");
+  const resetButton = document.getElementById("resetDefaults");
+  const shortcutItems = document.querySelectorAll(".shortcut-item");
 
   let recordingAction = null;
+  let activeKeys = []; // Array to preserve order
+  let pressedKeysSet = new Set(); // To handle multiple keydown events for the same key
 
   const DEFAULTS = {
     wordCount: 5,
     shortcuts: {
-      sentence: { ctrl: true, shift: false, alt: false, meta: false, trigger: 'CLICK', button: 0 },
-      word1: { ctrl: true, shift: true, alt: false, meta: false, trigger: 'CLICK', button: 0 },
-      word2: { ctrl: true, shift: false, alt: true, meta: false, trigger: 'CLICK', button: 0 },
-      wordN: { ctrl: false, shift: true, alt: false, meta: false, trigger: 'CLICK', button: 0 }
-    }
+      sentence: "L-Ctrl + R-Click",
+      word1: "L-Ctrl + L-Shift + R-Click",
+      word2: "L-Ctrl + L-Alt + R-Click",
+      wordN: "L-Shift + R-Click",
+    },
   };
 
   function loadSettings() {
-    chrome.storage.sync.get(['wordCount', 'shortcuts'], (result) => {
+    chrome.storage.sync.get(["wordCount", "shortcuts"], (result) => {
       if (result.wordCount) wordCountInput.value = result.wordCount;
       const shortcuts = result.shortcuts || DEFAULTS.shortcuts;
-      Object.keys(shortcuts).forEach(action => updateShortcutUI(action, shortcuts[action]));
+      Object.keys(shortcuts).forEach((action) => {
+        const el = document.getElementById(`key-${action}`);
+        if (el) el.textContent = shortcuts[action] || "None";
+      });
+      checkConflicts();
     });
   }
 
-  function formatTriggerText(trigger, button) {
-    if (!trigger) return '...';
-    if (trigger === 'CLICK') {
-      if (button === 2) return 'R-CLICK';
-      if (button === 1) return 'M-CLICK';
-      return 'L-CLICK';
-    }
-    return trigger.replace('Key', '').replace('Digit', '').replace('Arrow', '').toUpperCase();
+  function getReadableKeyName(event) {
+    const code = event.code;
+    const key = event.key;
+
+    // Modifiers with L/R distinction
+    const modifiers = {
+      ShiftLeft: "L-Shift",
+      ShiftRight: "R-Shift",
+      ControlLeft: "L-Ctrl",
+      ControlRight: "R-Ctrl",
+      AltLeft: "L-Alt",
+      AltRight: "R-Alt",
+      MetaLeft: "L-Meta",
+      MetaRight: "R-Meta",
+    };
+
+    if (modifiers[code]) return modifiers[code];
+
+    // Regular keys
+    if (key === " ") return "Space";
+    if (key.length === 1) return key.toUpperCase();
+    
+    // Function keys, arrow keys, etc.
+    return key;
   }
 
-  function updateShortcutUI(action, mapping) {
-    const el = document.getElementById(`key-${action}`);
-    if (!el) return;
+  function checkConflicts() {
+    chrome.storage.sync.get(["shortcuts"], (result) => {
+      const shortcuts = result.shortcuts || DEFAULTS.shortcuts;
+      const counts = {};
+      
+      // Count occurrences of each shortcut
+      Object.values(shortcuts).forEach(val => {
+        if (val && val !== "None") {
+          counts[val] = (counts[val] || 0) + 1;
+        }
+      });
 
-    const keys = [];
-    if (mapping.ctrl) keys.push('CTRL');
-    if (mapping.shift) keys.push('SHIFT');
-    if (mapping.alt) keys.push('ALT');
-    if (mapping.meta) keys.push('META');
-    
-    let triggerText = formatTriggerText(mapping.trigger, mapping.button);
-    const isTriggerAModifier = ['Control', 'Shift', 'Alt', 'Meta'].some(m => (mapping.trigger || "").includes(m));
-    
-    if (isTriggerAModifier && keys.length === 1) {
-       el.textContent = keys[0];
-    } else {
-       el.textContent = (keys.length > 0 ? keys.join(' + ') + ' + ' : '') + triggerText;
-    }
+      // Update UI for each item
+      shortcutItems.forEach(item => {
+        const action = item.dataset.action;
+        const val = shortcuts[action];
+        const isConflict = val && val !== "None" && counts[val] > 1;
+        
+        item.classList.toggle("conflict", isConflict);
+        item.querySelector(".conflict-warning").style.display = isConflict ? "block" : "none";
+      });
+    });
   }
 
-  // Save word count on every input change
-  wordCountInput.addEventListener('input', () => {
+  function saveShortcut(action, shortcutString) {
+    chrome.storage.sync.get(["shortcuts"], (result) => {
+      const shortcuts = result.shortcuts || DEFAULTS.shortcuts;
+      shortcuts[action] = shortcutString;
+      chrome.storage.sync.set({ shortcuts }, () => {
+        const el = document.getElementById(`key-${action}`);
+        if (el) el.textContent = shortcutString || "None";
+        checkConflicts();
+      });
+    });
+  }
+
+  function startRecording(item) {
+    if (recordingAction) return;
+
+    recordingAction = item.dataset.action;
+    item.classList.add("recording");
+    document.body.classList.add("is-recording");
+    
+    // Dim other items
+    shortcutItems.forEach(i => {
+      if (i !== item) i.classList.add("dimmed");
+    });
+
+    const previewEl = document.getElementById(`key-${recordingAction}`);
+    previewEl.textContent = "Recording...";
+    
+    activeKeys = [];
+    pressedKeysSet.clear();
+
+    const handleKeyDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.key === "Escape") {
+        cancelRecording();
+        return;
+      }
+
+      const keyName = getReadableKeyName(e);
+      if (!pressedKeysSet.has(e.code)) {
+        pressedKeysSet.add(e.code);
+        activeKeys.push(keyName);
+        previewEl.textContent = activeKeys.join(" + ");
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      pressedKeysSet.delete(e.code);
+      
+      // When all keys are released, finalize
+      if (pressedKeysSet.size === 0 && activeKeys.length > 0) {
+        finalizeRecording();
+      }
+    };
+
+    const finalizeRecording = () => {
+      const finalShortcut = activeKeys.join(" + ") + " + R-Click";
+      saveShortcut(recordingAction, finalShortcut);
+      stopListeners();
+      cleanup();
+    };
+
+    const cancelRecording = () => {
+      loadSettings(); // Revert UI
+      stopListeners();
+      cleanup();
+    };
+
+    const cleanup = () => {
+      item.classList.remove("recording");
+      document.body.classList.remove("is-recording");
+      shortcutItems.forEach(i => i.classList.remove("dimmed"));
+      recordingAction = null;
+    };
+
+    const stopListeners = () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("blur", cancelRecording);
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("blur", cancelRecording);
+  }
+
+  // Event Listeners
+  shortcutItems.forEach((item) => {
+    item.addEventListener("click", (e) => {
+      startRecording(item);
+    });
+  });
+
+  wordCountInput.addEventListener("input", () => {
     const value = parseInt(wordCountInput.value, 10);
     if (value >= 1) {
       chrome.storage.sync.set({ wordCount: value });
     }
   });
 
-  resetButton.addEventListener('click', () => {
+  resetButton.addEventListener("click", () => {
+    const originalContent = resetButton.innerHTML;
     chrome.storage.sync.set(DEFAULTS, () => {
       loadSettings();
-      const originalText = resetButton.innerHTML;
-      resetButton.textContent = 'Reset Done!';
-      setTimeout(() => resetButton.innerHTML = originalText, 1000);
-    });
-  });
-
-  shortcutItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-      if (recordingAction) return;
-
-      e.stopPropagation();
-      e.preventDefault();
-
-      recordingAction = item.dataset.action;
-      item.classList.add('recording');
-      globalHint.style.display = 'block';
-      globalHint.textContent = 'Capture: Click any mouse button OR press Key';
-      
-      const previewEl = document.getElementById(`key-${recordingAction}`);
-      previewEl.classList.add('active');
-      previewEl.textContent = '...';
-
-      const mods = { ctrl: false, shift: false, alt: false, meta: false };
-
-      const updateUI = (event) => {
-        const keys = [];
-        if (mods.ctrl) keys.push('CTRL');
-        if (mods.shift) keys.push('SHIFT');
-        if (mods.alt) keys.push('ALT');
-        if (mods.meta) keys.push('META');
-        
-        let t = '...';
-        if (event && event.type === 'mousedown') {
-           if (event.button === 2) t = 'R-CLICK';
-           else if (event.button === 1) t = 'M-CLICK';
-           else t = 'L-CLICK';
-        } else if (event && event.type === 'keydown' && !['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
-           t = event.code.replace('Key', '').toUpperCase();
-        }
-
-        previewEl.textContent = (keys.length > 0 ? keys.join(' + ') + ' + ' : '') + t;
-      };
-
-      const recordHandler = (event) => {
-        // Prevent default (like Right-Click menu) while recording
-        event.preventDefault();
-        event.stopPropagation();
-
-        const isModifier = ['Control', 'Shift', 'Alt', 'Meta'].includes(event.key);
-        
-        if (event.type === 'keydown') {
-           mods.ctrl = event.ctrlKey;
-           mods.shift = event.shiftKey;
-           mods.alt = event.altKey;
-           mods.meta = event.metaKey;
-           updateUI(event);
-           if (isModifier) return;
-        }
-
-        const finalMapping = {
-          ctrl: event.ctrlKey,
-          shift: event.shiftKey,
-          alt: event.altKey,
-          meta: event.metaKey,
-          trigger: event.type === 'mousedown' ? 'CLICK' : event.code,
-          button: event.type === 'mousedown' ? event.button : undefined
-        };
-
-        chrome.storage.sync.get(['shortcuts'], (result) => {
-          const shortcuts = result.shortcuts || DEFAULTS.shortcuts;
-          shortcuts[recordingAction] = finalMapping;
-          chrome.storage.sync.set({ shortcuts }, () => {
-            updateShortcutUI(recordingAction, finalMapping);
-            cleanup();
-          });
-        });
-
-        window.removeEventListener('keydown', recordHandler, true);
-        window.removeEventListener('mousedown', recordHandler, true);
-      };
-
-      const cleanup = () => {
-        item.classList.remove('recording');
-        if (previewEl) previewEl.classList.remove('active');
-        globalHint.style.display = 'none';
-        recordingAction = null;
-      };
-
-      window.focus();
-      setTimeout(() => {
-        window.addEventListener('keydown', recordHandler, true);
-        window.addEventListener('mousedown', recordHandler, true);
-      }, 100);
+      resetButton.textContent = "Done!";
+      setTimeout(() => resetButton.innerHTML = originalContent, 1000);
     });
   });
 
