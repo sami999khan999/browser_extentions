@@ -1,6 +1,11 @@
 // === Stats Tracking: Video watch time recording ===
 
-function updateStats() {
+/**
+ * @param {string|undefined} explicitVideoId - Force a specific video ID (used during navigation).
+ * @param {boolean} isFinalSync - If true, don't read from the video element (it may already
+ *   be reset by YouTube's SPA navigation). Use cached values from the last normal tick instead.
+ */
+function updateStats(explicitVideoId, isFinalSync) {
     if (window.yttContextInvalidated) return;
     
     const now = Date.now();
@@ -8,7 +13,7 @@ function updateStats() {
     lastWatchTimeUpdate = now;
 
     const watchFlexy = document.querySelector('ytd-watch-flexy');
-    let videoId = watchFlexy ? watchFlexy.getAttribute('video-id') : new URLSearchParams(window.location.search).get('v');
+    let videoId = explicitVideoId || (watchFlexy ? watchFlexy.getAttribute('video-id') : new URLSearchParams(window.location.search).get('v'));
     
     const video = document.querySelector('video.video-stream.html5-main-video') || document.querySelector('video');
     
@@ -26,9 +31,15 @@ function updateStats() {
     
     if (videoId) {
         currentUid = `${currentDay}_${videoId}`;
+
+        // Skip tracking for videos the user explicitly deleted
+        if (deletedUids.has(currentUid)) return;
+
         if (isNewVideo || !todayData.videos.find(v => v.uid === currentUid)) {
             if (isNewVideo) {
                 lastVideoId = videoId;
+                // New video loaded — old deletions no longer relevant
+                deletedUids.clear();
             }
             
             const videoTitleEl = document.querySelector('h1.ytd-watch-metadata') || 
@@ -49,12 +60,33 @@ function updateStats() {
                     startTime: new Date().toLocaleTimeString(),
                     watchedDuration: 0,
                     currentPosition: 0,
-                    totalDuration: (video && isFinite(video.duration) && video.duration > 0) ? video.duration : 0
+                    // Don't read duration from video element here — it might still
+                    // hold the previous video's duration (YouTube reuses the element).
+                    // Subsequent normal ticks will populate this correctly.
+                    totalDuration: 0
                 });
             }
         }
 
         const activeVideo = todayData.videos.find(v => v.uid === currentUid);
+
+        // --- FINAL SYNC PATH ---
+        // During navigation/unload, YouTube may have already reset the <video> element.
+        // Don't read from it — just send whatever we last cached on activeVideo.
+        if (isFinalSync && activeVideo) {
+            safeSendMessage({
+                action: 'REPORT_WATCH_TIME',
+                delta: 0,
+                videoId: videoId,
+                videoTitle: activeVideo.title,
+                channelName: activeVideo.channelName,
+                currentPosition: activeVideo.currentPosition || 0,
+                totalDuration: activeVideo.totalDuration || 0
+            });
+            return;
+        }
+
+        // --- NORMAL TRACKING PATH ---
         if (activeVideo && video) {
             // Lazy-load title and channel
             if (activeVideo.title === 'Loading Video...') {
@@ -67,38 +99,34 @@ function updateStats() {
                                       document.querySelector('ytd-video-owner-renderer #channel-name a');
                 if (channelNameEl) activeVideo.channelName = channelNameEl.textContent.trim();
             }
-            if ((!activeVideo.totalDuration || activeVideo.totalDuration === 0) && isFinite(video.duration) && video.duration > 0) {
-                 activeVideo.totalDuration = video.duration;
-            }
 
-            // Track current position specifically for the progress bar.
-            if (video.currentTime > 0 || (!video.paused && video.readyState >= 2)) {
-                activeVideo.currentPosition = video.currentTime;
+            // GUARD: When isNewVideo is true, skip reading from the <video> element.
+            // YouTube reuses the same element, so it may still hold the OLD video's
+            // currentTime and duration. Wait for the next tick when the element is stable.
+            if (!isNewVideo) {
+                // Update totalDuration when a valid value is available
+                const validDuration = isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+                if (validDuration > 0) {
+                    activeVideo.totalDuration = validDuration;
+                }
+
+                // Update current position from the live video element
+                if (isFinite(video.currentTime) && video.currentTime > 0) {
+                    activeVideo.currentPosition = video.currentTime;
+                }
             }
 
             // Report time and video state to background for atomic update
-            if (!video.paused && !video.ended && video.readyState >= 2) {
-                safeSendMessage({
-                    action: 'REPORT_WATCH_TIME',
-                    delta: delta,
-                    videoId: videoId,
-                    videoTitle: activeVideo.title,
-                    channelName: activeVideo.channelName,
-                    currentPosition: video.currentTime,
-                    totalDuration: video.duration
-                });
-            } else {
-                // Just sync position/state if not playing
-                safeSendMessage({
-                    action: 'REPORT_WATCH_TIME',
-                    delta: 0,
-                    videoId: videoId,
-                    videoTitle: activeVideo.title,
-                    channelName: activeVideo.channelName,
-                    currentPosition: video.currentTime,
-                    totalDuration: video.duration
-                });
-            }
+            const isPlaying = !isNewVideo && !video.paused && !video.ended && video.readyState >= 2;
+            safeSendMessage({
+                action: 'REPORT_WATCH_TIME',
+                delta: isPlaying ? delta : 0,
+                videoId: videoId,
+                videoTitle: activeVideo.title,
+                channelName: activeVideo.channelName,
+                currentPosition: activeVideo.currentPosition || 0,
+                totalDuration: activeVideo.totalDuration || 0
+            });
         }
     }
 

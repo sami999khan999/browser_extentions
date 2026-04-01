@@ -33,6 +33,7 @@ let continuousWatchStart = null;
 let breakModalShown = false;
 let preFetchedQuote = null;
 let isFetchingQuote = false;
+let deletedUids = new Set();
 
 /**
  * Initializes state from storage.local
@@ -128,6 +129,29 @@ function saveHistory() {
     safeSendMessage({ action: 'REPORT_WATCH_TIME', delta: 0 }); 
 }
 
+function deleteHistoryVideo(uid) {
+    deletedUids.add(uid);
+    safeSendMessage({ action: 'DELETE_VIDEO', uid });
+}
+
+function clearAllData() {
+    safeSendMessage({ action: 'CLEAR_HISTORY' }, () => {
+        // Reset in-memory settings (history will be updated via storage listener)
+        shortsBlockerSettings = { enabled: true };
+        breakSettings = { 
+            enabled: true, 
+            intervalMinutes: 15,
+            workUrl: 'https://www.google.com'
+        };
+        
+        saveShortsBlockerSettings();
+        saveBreakSettings();
+        
+        if (isStatsOpen) renderStats();
+        applyShortsBlockerState();
+    });
+}
+
 function saveShortsBlockerSettings() {
     safeSendMessage({ 
         action: 'SAVE_SETTINGS', 
@@ -173,27 +197,3 @@ storage.onChanged.addListener((changes, area) => {
         }
     }
 });
-
-function clearAllData() {
-    storage.local.clear(() => {
-        // Reset in-memory state
-        const currentDay = getDayKey();
-        allHistory = {
-            [currentDay]: { watchTime: 0, videos: [], sessionStart: Date.now() }
-        };
-        shortsBlockerSettings = { enabled: true };
-        breakSettings = { 
-            enabled: true, 
-            intervalMinutes: 15,
-            workUrl: 'https://www.google.com'
-        };
-        
-        // Trigger save and UI refresh
-        saveHistory();
-        saveShortsBlockerSettings();
-        saveBreakSettings();
-        
-        if (isStatsOpen) renderStats();
-        applyShortsBlockerState();
-    });
-}

@@ -34,11 +34,32 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'CLOSE_TAB' && sender.tab) {
         tabs.remove(sender.tab.id);
         sendResponse({ success: true });
+    } else if (request.action === 'DELETE_VIDEO') {
+        handleDeleteVideo(request.uid);
+        sendResponse({ success: true });
+    } else if (request.action === 'CLEAR_HISTORY') {
+        handleClearHistory();
+        sendResponse({ success: true });
     } else if (request.action === 'FETCH_QUOTE') {
         fetchZenQuote().then(sendResponse);
         return true; 
     }
 });
+
+function handleDeleteVideo(uid) {
+    Object.keys(allHistory).forEach(key => {
+        allHistory[key].videos = allHistory[key].videos.filter(v => v.uid !== uid);
+    });
+    storage.local.set({ 'ytt_history': allHistory });
+}
+
+function handleClearHistory() {
+    const currentDay = getDayKey();
+    allHistory = {
+        [currentDay]: { watchTime: 0, videos: [], sessionStart: Date.now() }
+    };
+    storage.local.set({ 'ytt_history': allHistory });
+}
 
 function handleWatchTimeReport(data) {
     const { delta, videoId, videoTitle, channelName, currentPosition, totalDuration } = data;
@@ -72,8 +93,8 @@ function handleWatchTimeReport(data) {
             videoEntry.watchedDuration += delta;
             todayData.watchTime += delta;
         }
-        if (currentPosition !== undefined) videoEntry.currentPosition = currentPosition;
-        if (totalDuration !== undefined) videoEntry.totalDuration = totalDuration;
+        if (currentPosition !== undefined && isFinite(currentPosition)) videoEntry.currentPosition = currentPosition;
+        if (totalDuration !== undefined && isFinite(totalDuration) && totalDuration > 0) videoEntry.totalDuration = totalDuration;
         if (videoTitle && videoEntry.title === 'Loading Video...') videoEntry.title = videoTitle;
         if (channelName && videoEntry.channelName === 'Loading Channel...') videoEntry.channelName = channelName;
     }

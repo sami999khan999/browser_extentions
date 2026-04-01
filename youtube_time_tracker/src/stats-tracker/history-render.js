@@ -113,10 +113,7 @@ function renderStats() {
                                 cancelText: 'Cancel',
                                 icon: '🗑️',
                                 onConfirm: () => {
-                                    Object.keys(allHistory).forEach(key => {
-                                        allHistory[key].videos = allHistory[key].videos.filter(v => v.uid !== uid);
-                                    });
-                                    saveHistory();
+                                    deleteHistoryVideo(uid);
                                     lastVideoCount = -1; // Force rebuild
                                     renderStats();
                                 }

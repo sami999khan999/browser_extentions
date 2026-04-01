@@ -39,6 +39,11 @@
     });
 
     // Handle YouTube's custom navigation events
+    window.addEventListener('yt-navigate-start', () => {
+        // Final sync: use cached values, YouTube may have already reset the video element
+        updateStats(lastVideoId, true);
+    });
+
     window.addEventListener('yt-page-data-updated', () => {
         applyShortsBlockerState();
         injectStatsUI();
@@ -49,5 +54,16 @@
     });
     window.addEventListener('popstate', () => {
         if (shortsBlockerSettings.enabled) blockShorts();
+    });
+
+    // Handle tab closure and backgrounding
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            updateStats(undefined, true);
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        updateStats(undefined, true);
     });
 })();
