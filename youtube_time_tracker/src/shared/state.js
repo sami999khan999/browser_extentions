@@ -68,22 +68,14 @@ async function initState() {
                 }
             }
 
-            // Apply history and cleanup old records (> 7 days)
-            history = history || {};
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const threshold = getDayKey(sevenDaysAgo);
-            
-            const cleanedHistory = {};
-            Object.keys(history).forEach(key => {
-                if (key >= threshold) cleanedHistory[key] = history[key];
-            });
-            allHistory = cleanedHistory;
+            // Apply history
+            allHistory = history || {};
             
             const todayKey = getDayKey();
             if (!allHistory[todayKey]) {
                 allHistory[todayKey] = { watchTime: 0, videos: [], sessionStart: Date.now() };
             }
+
 
             // Apply settings
             if (shortsSettings) shortsBlockerSettings = shortsSettings;

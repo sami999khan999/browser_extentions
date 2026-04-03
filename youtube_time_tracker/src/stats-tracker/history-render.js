@@ -58,7 +58,11 @@ function renderStats() {
             if (displayVideos.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; padding: 40px; color:#666;">No activity recorded for this period.</div>';
             } else {
-                listEl.innerHTML = displayVideos.slice().reverse().map(v => {
+                // Sort by lastUpdated descending (most recently active at the top)
+                const sortedVideos = displayVideos.slice().sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+                
+                listEl.innerHTML = sortedVideos.map(v => {
+
                     const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
                     const isActive = v.uid === currentUid;
                     return `
@@ -130,6 +134,12 @@ function renderStats() {
                     // Update highlighting if it changed
                     const isActive = videoData.uid === currentUid;
                     item.classList.toggle('active-tab-video', isActive);
+                    
+                    // If active AND not already the first child, move it to the top
+                    if (isActive && item.previousElementSibling) {
+                        listEl.prepend(item);
+                    }
+
 
                     const timeEl = item.querySelector('.time-readout');
                     const percentEl = item.querySelector('.video-percent');
