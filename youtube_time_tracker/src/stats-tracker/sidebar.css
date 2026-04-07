@@ -190,7 +190,7 @@ body.yt-shorts-resizing-active {
 }
 
 /* Nav Buttons */
-#nav-history, #nav-analytics, #nav-settings {
+#nav-history, #nav-analytics, #nav-backup, #nav-settings {
     background: transparent;
     border: none;
     color: var(--stats-text-secondary); /* Gray */
@@ -204,11 +204,11 @@ body.yt-shorts-resizing-active {
     transition: all 0.2s;
 }
 
-#nav-history:hover, #nav-analytics:hover, #nav-settings:hover {
+#nav-history:hover, #nav-analytics:hover, #nav-backup:hover, #nav-settings:hover {
     background: var(--stats-border); /* Light gray */
 }
 
-#nav-history.active, #nav-analytics.active, #nav-settings.active {
+#nav-history.active, #nav-analytics.active, #nav-backup.active, #nav-settings.active {
     color: var(--stats-primary);
     background: transparent;
 }

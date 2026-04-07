@@ -1,4 +1,5 @@
 // === Background Service Worker: Single Source of Truth for State ===
+importScripts('src/shared/db.js');
 
 // Cross-browser compatibility (Chrome / Firefox / Edge)
 const storage = chrome?.storage || browser.storage;
@@ -9,6 +10,8 @@ let allHistory = {};
 let shortsBlockerSettings = { enabled: true };
 let breakSettings = { enabled: true, intervalMinutes: 15, workUrl: 'https://www.google.com' };
 const activePlayingTabs = {}; // Tracks { tabId: timestamp }
+let backupSettings = { enabled: true, intervalHours: 24, backupOnClose: true };
+const youtubeTabs = new Set(); // Tracks active YouTube tabs for the "on close" backup
 
 // Load initial state from storage
 const loadPromise = new Promise((resolve) => {
@@ -24,6 +27,9 @@ const loadPromise = new Promise((resolve) => {
         
         if (data.ytt_shorts_settings) shortsBlockerSettings = data.ytt_shorts_settings;
         if (data.ytt_break_settings) breakSettings = data.ytt_break_settings;
+        if (data.ytt_backup_settings) backupSettings = data.ytt_backup_settings;
+        
+        scheduleAlarms();
         console.log('Background: State loaded and cleaned.');
         resolve();
     });
@@ -101,6 +107,18 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else if (request.action === 'FETCH_QUOTE') {
             const quote = await fetchZenQuote();
             sendResponse(quote);
+        } else if (request.action === 'GET_BACKUPS') {
+            const backups = await self.yttDB.getAllBackups();
+            sendResponse(backups);
+        } else if (request.action === 'CREATE_BACKUP_MANUAL') {
+            await createBackup();
+            sendResponse({ success: true });
+        } else if (request.action === 'DELETE_BACKUP') {
+            await self.yttDB.deleteBackup(request.id);
+            sendResponse({ success: true });
+        } else if (request.action === 'GET_BACKUP_FULL') {
+            const backup = await self.yttDB.getBackupById(request.id);
+            sendResponse(backup);
         }
     });
     return true; // Keep message channel open for asynchronous response
@@ -197,6 +215,10 @@ function handleSettingsUpdate(data) {
         storage.local.set({ 'ytt_break_settings': breakSettings });
     } else if (data.type === 'dislike') {
         storage.local.set({ 'ytt_dislike_settings': data.settings });
+    } else if (data.type === 'backup') {
+        backupSettings = data.settings;
+        storage.local.set({ 'ytt_backup_settings': backupSettings });
+        scheduleAlarms();
     }
 }
 
@@ -221,3 +243,55 @@ async function fetchZenQuote() {
     ];
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
+
+// === Backup Logic ===
+
+async function createBackup() {
+    const data = {
+        allHistory,
+        shortsBlockerSettings,
+        breakSettings,
+        backupSettings
+    };
+    try {
+        await self.yttDB.addBackup(data);
+        console.log('Background: Backup created successfully.');
+    } catch (e) {
+        console.error('Background: Backup failed:', e);
+    }
+}
+
+function scheduleAlarms() {
+    chrome.alarms.clear('ytt_periodic_backup', () => {
+        if (backupSettings.enabled && backupSettings.intervalHours > 0) {
+            chrome.alarms.create('ytt_periodic_backup', {
+                periodInMinutes: backupSettings.intervalHours * 60
+            });
+        }
+    });
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'ytt_periodic_backup') {
+        createBackup();
+    }
+});
+
+// Track YouTube tabs for "on close" backup
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (tab.url && tab.url.includes('youtube.com')) {
+        youtubeTabs.add(tabId);
+    } else {
+        youtubeTabs.delete(tabId);
+    }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+    if (youtubeTabs.has(tabId)) {
+        youtubeTabs.delete(tabId);
+        // If no more YouTube tabs are open, trigger backup
+        if (youtubeTabs.size === 0 && backupSettings.backupOnClose) {
+            createBackup();
+        }
+    }
+});

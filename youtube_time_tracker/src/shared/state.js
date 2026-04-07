@@ -20,6 +20,7 @@ let breakSettings = {
   workUrl: "https://www.google.com",
 };
 let dislikeCountSettings = { enabled: true };
+let backupSettings = { enabled: true, intervalHours: 24, backupOnClose: true };
 
 let selectedDayFilter = "today"; // 'today', 'yesterday', 'all', or 'YYYY-MM-DD'
 let activeView = "history"; // 'history', 'analytics', or 'settings'
@@ -48,6 +49,7 @@ async function initState() {
         "ytt_shorts_settings",
         "ytt_break_settings",
         "ytt_dislike_settings",
+        "ytt_backup_settings",
         "ytt_migrated",
       ],
       (data) => {
@@ -94,6 +96,9 @@ async function initState() {
         if (bSettings) breakSettings = bSettings;
         if (data.ytt_dislike_settings) {
           dislikeCountSettings.enabled = data.ytt_dislike_settings.enabled ?? true;
+        }
+        if (data.ytt_backup_settings) {
+          backupSettings = data.ytt_backup_settings;
         }
 
         console.log("YouTube Time Tracker: State initialized from storage.");
@@ -239,6 +244,14 @@ function saveBreakSettings() {
   });
 }
 
+function saveBackupSettings() {
+  safeSendMessage({
+    action: "SAVE_SETTINGS",
+    type: "backup",
+    settings: backupSettings,
+  });
+}
+
 // Sync listener: keeps all open tabs in sync when storage changes
 storage.onChanged.addListener((changes, area) => {
   try {
@@ -270,6 +283,13 @@ storage.onChanged.addListener((changes, area) => {
         breakSettings.enabled = newValue.enabled;
         breakSettings.intervalMinutes = newValue.intervalMinutes;
         breakSettings.workUrl = newValue.workUrl;
+      }
+      if (changes.ytt_backup_settings) {
+        backupSettings = changes.ytt_backup_settings.newValue || {
+          enabled: true,
+          intervalHours: 24,
+          backupOnClose: true,
+        };
       }
 
       // Only re-render if the stats panel is actually open
