@@ -122,19 +122,19 @@ function showMultiTabToast(otherTabId, onDismiss) {
         position: fixed;
         bottom: 32px;
         right: 32px;
-        background: rgba(20, 20, 22, 0.75);
+        background: var(--stats-sidebar-bg);
         backdrop-filter: blur(16px) saturate(180%);
         -webkit-backdrop-filter: blur(16px) saturate(180%);
-        color: #ffffff;
+        color: var(--stats-text-primary);
         padding: 16px 20px;
         border-radius: 16px;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--stats-border);
         display: flex;
         align-items: center;
         gap: 18px;
         z-index: 999999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Inter', -apple-system, sans-serif;
         transform: translateY(120%) scale(0.95);
         opacity: 0;
         transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -142,69 +142,29 @@ function showMultiTabToast(otherTabId, onDismiss) {
     `;
 
     toast.innerHTML = `
-        <div class="ytt-toast-icon-container" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: rgba(255, 59, 48, 0.15); border-radius: 50%; border: 1px solid rgba(255, 59, 48, 0.3); flex-shrink: 0;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="ytt-toast-icon-container" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: var(--stats-card-accent-bg); border-radius: 12px; border: 1.5px solid var(--stats-primary); flex-shrink: 0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--stats-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-weight: 600; font-size: 15px; letter-spacing: -0.2px;">Action Required</div>
-            <div style="font-size: 13px; color: rgba(255, 255, 255, 0.7); line-height: 1.4;">This exact video is currently playing in another tab.</div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-weight: 700; font-size: 14px; letter-spacing: -0.1px;">Multiple Tabs Active</div>
+            <div style="font-size: 13px; color: var(--stats-text-secondary); line-height: 1.4;">Video is playing in another tab.</div>
         </div>
-        <div style="display: flex; gap: 10px; margin-left: 8px;">
-            <button id="toast-close-other" style="
-                background: linear-gradient(135deg, #ff3b30, #ff2a6d);
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 500;
-                font-size: 13px;
-                letter-spacing: 0.2px;
-                box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            ">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                Close Tab
-            </button>
-            <button id="toast-dismiss" style="
-                background: rgba(255, 255, 255, 0.05);
-                color: rgba(255, 255, 255, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                padding: 8px 16px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 500;
-                font-size: 13px;
-                transition: all 0.2s ease;
-            ">Ignore</button>
+        <div style="display: flex; gap: 8px; margin-left: 8px;">
+            <button id="toast-close-other" class="modal-btn premium-primary" style="padding: 0 16px; min-width: 100px;">Close Other</button>
+            <button id="toast-dismiss" class="modal-btn premium-secondary" style="padding: 0 16px;">Ignore</button>
         </div>
     `;
 
     document.body.appendChild(toast);
 
     // Dynamic Hover & Active States
+    // Dynamic Hover & Active States (Removed for CSS-based states)
     const closeBtn = document.getElementById('toast-close-other');
-    closeBtn.onmouseover = () => {
-        closeBtn.style.transform = 'translateY(-1px)';
-        closeBtn.style.boxShadow = '0 6px 16px rgba(255, 59, 48, 0.4)';
-    };
-    closeBtn.onmouseout = () => {
-        closeBtn.style.transform = 'translateY(0)';
-        closeBtn.style.boxShadow = '0 4px 12px rgba(255, 59, 48, 0.3)';
-    };
-    closeBtn.onmousedown = () => closeBtn.style.transform = 'translateY(1px) scale(0.96)';
-
     const dismissBtn = document.getElementById('toast-dismiss');
-    dismissBtn.onmouseover = () => dismissBtn.style.background = 'rgba(255, 255, 255, 0.12)';
-    dismissBtn.onmouseout = () => dismissBtn.style.background = 'rgba(255, 255, 255, 0.05)';
-    dismissBtn.onmousedown = () => dismissBtn.style.transform = 'scale(0.96)';
 
     const removeToast = () => {
         toast.style.transform = 'translateY(120%) scale(0.95)';
@@ -250,48 +210,20 @@ function showMultiTabModal(otherTabId, onKeep) {
     overlay.setAttribute('aria-labelledby', 'multitab-title');
 
     overlay.innerHTML = `
-        <div class="stats-modal" style="
-            background: rgba(20, 20, 22, 0.85);
-            backdrop-filter: blur(24px) saturate(200%);
-            -webkit-backdrop-filter: blur(24px) saturate(200%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-        ">
-            <div style="
-                width: 64px; 
-                height: 64px; 
-                background: linear-gradient(135deg, rgba(255, 59, 48, 0.2), rgba(255, 42, 109, 0.2)); 
-                border: 1px solid rgba(255, 59, 48, 0.3);
-                border-radius: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 24px;
-                font-size: 32px;
-                box-shadow: 0 8px 24px rgba(255, 59, 48, 0.2);
-            ">📺</div>
-            <h2 id="multitab-title" class="stats-modal-title" style="color: #ffffff; letter-spacing: -0.5px;">Duplicate Playback</h2>
-            <p class="stats-modal-message" style="color: rgba(255, 255, 255, 0.7); font-size: 14px; margin-bottom: 32px;">This exact video is playing in another window. We've paused it here to avoid duplicate tracking.</p>
-            <div class="stats-modal-actions" style="display: flex; gap: 12px;">
-                <button id="modal-keep-this" class="modal-btn secondary" style="
-                    background: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    color: #fff;
-                    flex: 1;
-                    height: 48px;
-                    border-radius: 12px;
-                    font-weight: 600;
-                ">Keep Window</button>
-                <button id="modal-close-other" class="modal-btn danger" style="
-                    background: linear-gradient(135deg, #ff3b30, #ff2a6d);
-                    border: none;
-                    color: #fff;
-                    flex: 1;
-                    height: 48px;
-                    border-radius: 12px;
-                    font-weight: 600;
-                    box-shadow: 0 4px 15px rgba(255, 59, 48, 0.4);
-                ">Close Other</button>
+        <div class="stats-modal premium">
+            <div class="ytt-icon-box">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FF0000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                    <path d="M10 7l5 2-5 2z" fill="#FF0000"></path>
+                </svg>
+            </div>
+            <h2 id="multitab-title" class="stats-modal-title" style="margin-bottom: 8px;">Duplicate Playback</h2>
+            <p class="stats-modal-message">We've noticed this video is playing in another window. We've paused it here to keep your tracking accurate.</p>
+            <div class="stats-modal-actions" style="margin-top: 32px;">
+                <button id="modal-keep-this" class="modal-btn premium-secondary">Keep Here</button>
+                <button id="modal-close-other" class="modal-btn premium-primary">Close Other</button>
             </div>
         </div>
     `;

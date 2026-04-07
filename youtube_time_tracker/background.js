@@ -116,7 +116,15 @@ function getDayKey(date = new Date()) {
 
 function handleDeleteVideo(uid) {
     Object.keys(allHistory).forEach(key => {
-        allHistory[key].videos = allHistory[key].videos.filter(v => v.uid !== uid);
+        const videoIndex = allHistory[key].videos.findIndex(v => v.uid === uid);
+        if (videoIndex !== -1) {
+            const video = allHistory[key].videos[videoIndex];
+            // Subtract the video's watched duration from the day total watchTime
+            if (video && video.watchedDuration > 0) {
+                allHistory[key].watchTime = Math.max(0, (allHistory[key].watchTime || 0) - video.watchedDuration);
+            }
+            allHistory[key].videos.splice(videoIndex, 1);
+        }
     });
     storage.local.set({ 'ytt_history': allHistory });
 }
