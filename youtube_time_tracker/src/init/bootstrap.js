@@ -6,6 +6,7 @@
 
     // Initial Run
     applyShortsBlockerState();
+    applyDislikeCountState();
     injectStatsUI();
     setupFullscreenAutoHide();
 
@@ -26,9 +27,9 @@
         }
     }, 1000);
 
-    // Observe DOM changes for dynamic elements
     const observer = new MutationObserver(() => {
         if (shortsBlockerSettings.enabled) blockShorts();
+        applyDislikeCountState();
         // Ensure UI is re-injected if YouTube's SPA wipes it
         injectStatsUI();
     });
@@ -46,10 +47,12 @@
 
     window.addEventListener('yt-page-data-updated', () => {
         applyShortsBlockerState();
+        applyDislikeCountState();
         injectStatsUI();
     });
     window.addEventListener('yt-navigate-finish', () => {
         applyShortsBlockerState();
+        applyDislikeCountState();
         injectStatsUI();
     });
     window.addEventListener('popstate', () => {

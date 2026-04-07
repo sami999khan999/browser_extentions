@@ -38,7 +38,10 @@ const JS_FILES = [
     // 4. Break Reminder domain
     'break-reminder/reminder.js',
 
-    // 5. Initialization (must be last)
+    // 5. Dislike Counter domain
+    'dislike-counter/dislike-counter.js',
+
+    // 6. Initialization (must be last)
     'init/bootstrap.js',
 ];
 

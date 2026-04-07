@@ -12,7 +12,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "host_permissions": ["*://*.youtube.com/*", "https://zenquotes.io/*"],
+  "host_permissions": ["*://*.youtube.com/*", "https://zenquotes.io/*", "https://returnyoutubedislikeapi.com/*"],
 
   "content_scripts": [
     {

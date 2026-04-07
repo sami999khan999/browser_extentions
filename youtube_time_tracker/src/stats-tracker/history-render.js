@@ -10,21 +10,21 @@ function renderStats() {
     const yesterday = getDayKey(new Date(now.getTime() - 86400000));
     
     if (selectedDayFilter === 'today') {
-        const data = allHistory[today] || { watchTime: 0, videos: [], sessionStart: Date.now() };
+        const data = allHistory[today] || { watchTime: 0, activeTime: 0, videos: [], sessionStart: Date.now() };
         displayWatchTime = data.watchTime;
         displayVideos = data.videos;
-        displayDuration = Math.floor((Date.now() - data.sessionStart) / 1000);
+        displayDuration = data.activeTime || 0;
     } else if (selectedDayFilter === 'yesterday') {
-        const data = allHistory[yesterday] || { watchTime: 0, videos: [], sessionStart: 0 };
+        const data = allHistory[yesterday] || { watchTime: 0, activeTime: 0, videos: [], sessionStart: 0 };
         displayWatchTime = data.watchTime;
         displayVideos = data.videos;
-        displayDuration = 0;
+        displayDuration = data.activeTime || 0;
     } else {
         Object.values(allHistory).forEach(day => {
             displayWatchTime += day.watchTime;
             displayVideos = displayVideos.concat(day.videos);
+            displayDuration += (day.activeTime || 0);
         });
-        displayDuration = 0;
     }
 
     if (activeView === 'history') {

@@ -41,7 +41,11 @@ function updateStats(explicitVideoId, isFinalSync) {
     currentUid = `${currentDay}_${videoId}`;
 
     // Skip tracking for videos the user explicitly deleted
-    if (deletedUids.has(currentUid)) return;
+    if (deletedUids.has(currentUid)) {
+      // Still send a heartbeat even if this specific video is blacklisted
+      safeSendMessage({ action: 'REPORT_WATCH_TIME', delta });
+      return;
+    }
 
     if (isNewVideo || !todayData.videos.find((v) => v.uid === currentUid)) {
       if (isNewVideo) {
@@ -186,6 +190,9 @@ function updateStats(explicitVideoId, isFinalSync) {
         },
       );
     }
+  } else {
+    // Heartbeat for non-video pages (Home, Subscriptions, etc.) to track active session time
+    safeSendMessage({ action: "REPORT_WATCH_TIME", delta });
   }
 
   if (isStatsOpen) {

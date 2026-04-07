@@ -100,6 +100,19 @@ function getSidebarHTML() {
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.dislike}</span>
+                                    <span class="settings-item-label">Show Dislike Count</span>
+                                </div>
+                                <span class="settings-item-desc">Bring back the YouTube dislike count using the RYD API</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="dislike-count-toggle" ${dislikeCountSettings.enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 

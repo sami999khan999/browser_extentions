@@ -119,7 +119,6 @@ function handleDeleteVideo(uid) {
         const videoIndex = allHistory[key].videos.findIndex(v => v.uid === uid);
         if (videoIndex !== -1) {
             const video = allHistory[key].videos[videoIndex];
-            // Subtract the video's watched duration from the day total watchTime
             if (video && video.watchedDuration > 0) {
                 allHistory[key].watchTime = Math.max(0, (allHistory[key].watchTime || 0) - video.watchedDuration);
             }
@@ -132,7 +131,7 @@ function handleDeleteVideo(uid) {
 function handleClearHistory() {
     const currentDay = getDayKey();
     allHistory = {
-        [currentDay]: { watchTime: 0, videos: [], sessionStart: Date.now() }
+        [currentDay]: { watchTime: 0, activeTime: 0, videos: [], sessionStart: Date.now() }
     };
     storage.local.set({ 'ytt_history': allHistory });
 }
@@ -142,7 +141,7 @@ function handleWatchTimeReport(data) {
     const currentDay = getDayKey();
     
     if (!allHistory[currentDay]) {
-        allHistory[currentDay] = { watchTime: 0, videos: [], sessionStart: Date.now() };
+        allHistory[currentDay] = { watchTime: 0, activeTime: 0, videos: [], sessionStart: Date.now() };
     }
     
     const todayData = allHistory[currentDay];
@@ -172,13 +171,20 @@ function handleWatchTimeReport(data) {
             todayData.watchTime += delta;
         }
         if (currentPosition !== undefined && isFinite(currentPosition)) videoEntry.currentPosition = currentPosition;
-
         if (totalDuration !== undefined && isFinite(totalDuration) && totalDuration > 0) videoEntry.totalDuration = totalDuration;
         if (videoTitle && videoEntry.title === 'Loading Video...') videoEntry.title = videoTitle;
         if (channelName && videoEntry.channelName === 'Loading Channel...') videoEntry.channelName = channelName;
     }
+
+    // Track active usage time (heartbeat)
+    if (delta >= 0) {
+        // Even if delta is 0, we still count the heartbeat as long as the content script pulses
+        // But tracking.js sends delta=1 (approx) every tick. 
+        // If delta is 0, we'll use a 1s increment to represent the heartbeat.
+        const activeDelta = delta > 0 ? delta : 1; 
+        todayData.activeTime = (todayData.activeTime || 0) + activeDelta;
+    }
     
-    // Save to storage (throttled/debounced in a real app, but once per second per tab is usually fine for local storage)
     storage.local.set({ 'ytt_history': allHistory });
 }
 
@@ -189,6 +195,8 @@ function handleSettingsUpdate(data) {
     } else if (data.type === 'break') {
         breakSettings = data.settings;
         storage.local.set({ 'ytt_break_settings': breakSettings });
+    } else if (data.type === 'dislike') {
+        storage.local.set({ 'ytt_dislike_settings': data.settings });
     }
 }
 
