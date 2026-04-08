@@ -1,25 +1,168 @@
 // === Sidebar Event Bindings: Filters, navigation, settings, open/close ===
 
 function bindSidebarEvents(sidebar, btn, dragStatus) {
-  // Filter Logic
-  const chips = sidebar.querySelectorAll(".filter-chip");
-  chips.forEach((chip) => {
-    chip.onclick = (e) => {
-      e.stopPropagation();
-      chips.forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
-      selectedDayFilter = chip.dataset.filter;
+  // Date Navigator & Calendar Logic
+  let calendarDate = new Date(); // Month/Year currently shown in the calendar popover
 
-      const titles = {
-        today: "Watch History (Today)",
-        yesterday: "Watch History (Yesterday)",
-        all: "Watch History (Last 7 Days)",
-      };
-      const titleEl = document.getElementById("history-title");
-      if (titleEl) titleEl.textContent = titles[selectedDayFilter];
-      renderStats();
+  const updateDateLabel = () => {
+    const label = document.querySelector(".current-date-label");
+    if (!label) return;
+
+    if (selectedDayFilter === "today") {
+      label.textContent = "Today";
+    } else if (selectedDayFilter === "yesterday") {
+      label.textContent = "Yesterday";
+    } else if (selectedDayFilter === "all") {
+      label.textContent = "All Time";
+    } else {
+      // YYYY-MM-DD format
+      const [y, m, d] = selectedDayFilter.split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+      label.textContent = date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: y !== new Date().getFullYear() ? "numeric" : undefined,
+      });
+    }
+    
+    // Update "All Time" chip active state
+    const allTimeChip = sidebar.querySelector('.filter-chip.special');
+    if (allTimeChip) {
+        allTimeChip.classList.toggle('active', selectedDayFilter === 'all');
+    }
+  };
+
+  const renderCalendar = () => {
+    const container = document.getElementById("calendar-popover");
+    if (!container) return;
+
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const monthName = new Date(year, month).toLocaleString(undefined, {
+      month: "long",
+    });
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayStr = getDayKey(new Date());
+    const selectedStr =
+      selectedDayFilter === "today"
+        ? todayStr
+        : selectedDayFilter === "yesterday"
+        ? getDayKey(new Date(Date.now() - 86400000))
+        : selectedDayFilter;
+
+    let html = `
+      <div class="calendar-header">
+        <div class="calendar-month-year">${monthName} ${year}</div>
+        <div class="calendar-nav">
+          <button id="cal-prev" class="nav-arrow-btn">${icons.prev}</button>
+          <button id="cal-next" class="nav-arrow-btn">${icons.next}</button>
+        </div>
+      </div>
+      <div class="calendar-grid">
+        <div class="calendar-day-label">Su</div>
+        <div class="calendar-day-label">Mo</div>
+        <div class="calendar-day-label">Tu</div>
+        <div class="calendar-day-label">We</div>
+        <div class="calendar-day-label">Th</div>
+        <div class="calendar-day-label">Fr</div>
+        <div class="calendar-day-label">Sa</div>
+    `;
+
+    // Empty slots before first day
+    for (let i = 0; i < firstDay; i++) {
+      html += '<div class="calendar-day empty"></div>';
+    }
+
+    // Days of month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+        d,
+      ).padStart(2, "0")}`;
+      const isToday = dateKey === todayStr;
+      const isSelected = dateKey === selectedStr;
+
+      html += `
+        <div class="calendar-day ${isToday ? "today" : ""} ${
+        isSelected ? "selected" : ""
+      }" data-date="${dateKey}">
+          ${d}
+        </div>
+      `;
+    }
+
+    html += "</div>";
+    container.innerHTML = html;
+
+    // Calendar Handlers
+    container.querySelector("#cal-prev").onclick = (e) => {
+      e.stopPropagation();
+      calendarDate.setMonth(calendarDate.getMonth() - 1);
+      renderCalendar();
     };
-  });
+    container.querySelector("#cal-next").onclick = (e) => {
+      e.stopPropagation();
+      calendarDate.setMonth(calendarDate.getMonth() + 1);
+      renderCalendar();
+    };
+    container.querySelectorAll(".calendar-day:not(.empty)").forEach((el) => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        selectedDayFilter = el.dataset.date === todayStr ? "today" : el.dataset.date;
+        container.style.display = "none";
+        updateDateLabel();
+        renderStats();
+      };
+    });
+  };
+
+  const trigger = document.getElementById("calendar-trigger");
+  const popover = document.getElementById("calendar-popover");
+  if (trigger && popover) {
+    trigger.onclick = (e) => {
+      e.stopPropagation();
+      const isVisible = popover.style.display === "block";
+      popover.style.display = isVisible ? "none" : "block";
+      if (!isVisible) renderCalendar();
+    };
+  }
+
+  const prevBtn = document.getElementById("date-prev");
+  const nextBtn = document.getElementById("date-next");
+
+  const shiftDate = (offset) => {
+    let current;
+    if (selectedDayFilter === "today") current = new Date();
+    else if (selectedDayFilter === "yesterday") current = new Date(Date.now() - 86400000);
+    else if (selectedDayFilter === "all") current = new Date();
+    else {
+      const [y, m, d] = selectedDayFilter.split("-").map(Number);
+      current = new Date(y, m - 1, d);
+    }
+    current.setDate(current.getDate() + offset);
+    
+    const newKey = getDayKey(current);
+    selectedDayFilter = (newKey === getDayKey(new Date())) ? "today" : newKey;
+    updateDateLabel();
+    renderStats();
+  };
+
+  if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); shiftDate(-1); };
+  if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); shiftDate(1); };
+
+  const allTimeChip = sidebar.querySelector('.filter-chip.special');
+  if (allTimeChip) {
+    allTimeChip.onclick = (e) => {
+        e.stopPropagation();
+        selectedDayFilter = 'all';
+        updateDateLabel();
+        renderStats();
+    };
+  }
+
+  // Initial label update
+  updateDateLabel();
 
   // View Navigation Logic
   const switchView = (viewName) => {
@@ -220,6 +363,80 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     });
   }
 
+  const retentionDropdown = document.getElementById("retention-duration-dropdown");
+  if (retentionDropdown) {
+    const trigger = retentionDropdown.querySelector(".dropdown-trigger");
+    const menu = retentionDropdown.querySelector(".dropdown-menu");
+    const items = retentionDropdown.querySelectorAll(".dropdown-item");
+
+    trigger.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = retentionDropdown.classList.contains("open");
+      document
+        .querySelectorAll(".custom-dropdown.open")
+        .forEach((d) => d.classList.remove("open"));
+      if (!isOpen) retentionDropdown.classList.add("open");
+    };
+
+    items.forEach((item) => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const value = parseInt(item.dataset.value, 10);
+        const label = item.textContent;
+
+        // Update state
+        retentionSettings.duration = value;
+        saveRetentionSettings();
+
+        // Update UI
+        retentionDropdown.dataset.value = value;
+        trigger.querySelector("span").textContent = label;
+        items.forEach((i) => i.classList.remove("active"));
+        item.classList.add("active");
+
+        // Close
+        retentionDropdown.classList.remove("open");
+      };
+    });
+  }
+  
+  const maxBackupsMinus = document.getElementById("max-backups-minus");
+  const maxBackupsPlus = document.getElementById("max-backups-plus");
+  const maxBackupsValue = document.getElementById("max-backups-value");
+
+  if (maxBackupsMinus) {
+    maxBackupsMinus.onclick = (e) => {
+      e.stopPropagation();
+      backupSettings.maxBackups = Math.max(
+        1,
+        (backupSettings.maxBackups || 10) - 1,
+      );
+      if (maxBackupsValue) maxBackupsValue.value = backupSettings.maxBackups;
+      saveBackupSettings();
+    };
+  }
+  if (maxBackupsPlus) {
+    maxBackupsPlus.onclick = (e) => {
+      e.stopPropagation();
+      backupSettings.maxBackups = Math.min(
+        50,
+        (backupSettings.maxBackups || 10) + 1,
+      );
+      if (maxBackupsValue) maxBackupsValue.value = backupSettings.maxBackups;
+      saveBackupSettings();
+    };
+  }
+  if (maxBackupsValue) {
+    maxBackupsValue.onchange = (e) => {
+      let val = parseInt(maxBackupsValue.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      if (val > 50) val = 50;
+      backupSettings.maxBackups = val;
+      maxBackupsValue.value = val;
+      saveBackupSettings();
+    };
+  }
+
   // Close dropdowns on outside click
   document.addEventListener("click", () => {
     document
@@ -228,6 +445,96 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   });
 
   const createBackupBtn = document.getElementById("create-manual-backup");
+  const deleteBtn = document.getElementById("delete-all-backups");
+  if (deleteBtn) {
+    deleteBtn.onclick = () => {
+        showConfirmModal({
+            title: "Clear All Backups?",
+            message: "This will permanently delete all stored snapshots in the local database. This action cannot be undone.",
+            confirmText: "Clear All",
+            cancelText: "Cancel",
+            icon: "🗑️",
+            onConfirm: () => {
+                safeSendMessage({ action: "DELETE_ALL_BACKUPS" }, (response) => {
+                    if (response && response.success) {
+                        renderBackups();
+                    } else {
+                        alert("Failed to clear backups: " + (response ? response.error : "Unknown error"));
+                    }
+                });
+            }
+        });
+    };
+  }
+
+  // Import JSON Click
+  const importBtn = document.getElementById("import-backup-json");
+  const fileInput = document.getElementById("backup-file-input");
+
+  if (importBtn && fileInput) {
+    importBtn.onclick = (e) => {
+      e.stopPropagation();
+      fileInput.click();
+    };
+
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const importedData = JSON.parse(event.target.result);
+          
+          // Basic validation
+          if (!importedData.allHistory && !importedData.shortsBlockerSettings) {
+             throw new Error("Invalid backup file format");
+          }
+
+          showConfirmModal({
+            title: "Import Backup?",
+            message: "This will overwrite your current history and settings. Are you sure?",
+            confirmText: "Import & Restore",
+            cancelText: "Cancel",
+            icon: "📥",
+            onConfirm: () => {
+              importBtn.disabled = true;
+              importBtn.textContent = "Importing...";
+
+              safeSendMessage({ action: "IMPORT_BACKUP", clientData: importedData }, (response) => {
+                importBtn.disabled = false;
+                importBtn.textContent = "Import JSON";
+                fileInput.value = ""; // Reset input
+
+                if (response && response.success) {
+                   // Refresh everything
+                   switchView("history");
+                   renderStats();
+                   renderBackups();
+                   
+                   // Show success feedback
+                   const originalHtml = importBtn.innerHTML;
+                   importBtn.textContent = "Imported!";
+                   importBtn.style.color = "#2ecc71";
+                   setTimeout(() => {
+                      importBtn.innerHTML = originalHtml;
+                      importBtn.style.color = "";
+                   }, 2000);
+                } else {
+                   alert("Failed to import backup: " + (response ? response.error : "Unknown error"));
+                }
+              });
+            }
+          });
+        } catch (err) {
+          alert("Error parsing backup file: " + err.message);
+          fileInput.value = "";
+        }
+      };
+      reader.readAsText(file);
+    };
+  }
+
   if (createBackupBtn) {
     createBackupBtn.onclick = (e) => {
       e.stopPropagation();
@@ -338,8 +645,28 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     }
   });
 
+  // Scroll Listener for Infinite History
+  const statsBody = sidebar.querySelector(".stats-body");
+  if (statsBody) {
+    statsBody.onscroll = () => {
+        if (activeView !== 'history') return;
+        
+        // Trigger if we are 200px from the bottom
+        const threshold = 200;
+        const remaining = statsBody.scrollHeight - (statsBody.scrollTop + statsBody.clientHeight);
+        
+        if (remaining < threshold) {
+            appendHistoryBatch();
+        }
+    };
+  }
+
   // Close on click outside
   document.addEventListener("click", (e) => {
+    if (popover && !popover.contains(e.target) && e.target !== trigger) {
+        popover.style.display = "none";
+    }
+    
     if (isStatsOpen && !sidebar.contains(e.target) && e.target !== btn) {
       isStatsOpen = false;
       sidebar.classList.remove("open");
@@ -385,6 +712,9 @@ function renderBackups() {
                     <span class="backup-meta">Snapshot - YouTube History</span>
                 </div>
                 <div class="backup-actions">
+                    <button class="backup-btn restore-btn" title="Restore this Backup" data-id="${b.id}">
+                        ${icons.restore}
+                    </button>
                     <button class="backup-btn download-btn" title="Download as JSON" data-id="${b.id}">
                         ${icons.download}
                     </button>
@@ -393,6 +723,31 @@ function renderBackups() {
                     </button>
                 </div>
             `;
+
+      // Restore Action
+      item.querySelector(".restore-btn").onclick = (e) => {
+        e.stopPropagation();
+        const id = e.currentTarget.dataset.id;
+        showConfirmModal({
+          title: "Restore this Backup?",
+          message: "This will completely overwrite your current history and settings with data from this snapshot. Are you sure?",
+          confirmText: "Restore Now",
+          cancelText: "Cancel",
+          icon: "🔄",
+          onConfirm: () => {
+             safeSendMessage({ action: "RESTORE_BACKUP", id: id }, (response) => {
+                 if (response && response.success) {
+                    // Success feedback
+                    switchView("history");
+                    renderStats();
+                    renderBackups();
+                 } else {
+                    alert("Failed to restore: " + (response ? response.error : "Unknown error"));
+                 }
+             });
+          }
+        });
+      };
 
       // Download Action
       item.querySelector(".download-btn").onclick = (e) => {

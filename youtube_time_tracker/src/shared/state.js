@@ -20,7 +20,15 @@ let breakSettings = {
   workUrl: "https://www.google.com",
 };
 let dislikeCountSettings = { enabled: true };
-let backupSettings = { enabled: true, intervalHours: 24, backupOnClose: true };
+let backupSettings = {
+  enabled: true,
+  intervalHours: 24,
+  backupOnClose: true,
+  maxBackups: 10,
+};
+let retentionSettings = {
+  duration: 7, // Default 7 days
+};
 
 let selectedDayFilter = "today"; // 'today', 'yesterday', 'all', or 'YYYY-MM-DD'
 let activeView = "history"; // 'history', 'analytics', or 'settings'
@@ -36,6 +44,10 @@ let breakModalShown = false;
 let preFetchedQuote = null;
 let isFetchingQuote = false;
 let deletedUids = new Set();
+let fullSortedVideos = [];
+let loadedVideoCount = 0;
+const historyPageSize = 50;
+let isInfiniteScrolling = false;
 
 /**
  * Initializes state from storage.local
@@ -50,6 +62,7 @@ async function initState() {
         "ytt_break_settings",
         "ytt_dislike_settings",
         "ytt_backup_settings",
+        "ytt_retention_settings",
         "ytt_migrated",
       ],
       (data) => {
@@ -95,10 +108,17 @@ async function initState() {
         if (shortsSettings) shortsBlockerSettings = shortsSettings;
         if (bSettings) breakSettings = bSettings;
         if (data.ytt_dislike_settings) {
-          dislikeCountSettings.enabled = data.ytt_dislike_settings.enabled ?? true;
+          dislikeCountSettings.enabled =
+            data.ytt_dislike_settings.enabled ?? true;
         }
         if (data.ytt_backup_settings) {
-          backupSettings = data.ytt_backup_settings;
+          backupSettings = { ...backupSettings, ...data.ytt_backup_settings };
+        }
+        if (data.ytt_retention_settings) {
+          retentionSettings = {
+            ...retentionSettings,
+            ...data.ytt_retention_settings,
+          };
         }
 
         console.log("YouTube Time Tracker: State initialized from storage.");
@@ -252,6 +272,14 @@ function saveBackupSettings() {
   });
 }
 
+function saveRetentionSettings() {
+  safeSendMessage({
+    action: "SAVE_SETTINGS",
+    type: "retention",
+    settings: retentionSettings,
+  });
+}
+
 // Sync listener: keeps all open tabs in sync when storage changes
 storage.onChanged.addListener((changes, area) => {
   try {
@@ -263,13 +291,15 @@ storage.onChanged.addListener((changes, area) => {
         needsUIRefresh = true;
       }
       if (changes.ytt_shorts_settings) {
-        const newValue = changes.ytt_shorts_settings.newValue || { enabled: true };
+        const newValue = changes.ytt_shorts_settings.newValue || {
+          enabled: true,
+        };
         shortsBlockerSettings.enabled = newValue.enabled;
         applyShortsBlockerState(); // Live apply shorts blocker toggle
       }
       if (changes.ytt_dislike_settings) {
         const newValue = changes.ytt_dislike_settings.newValue;
-        if (newValue && typeof newValue === 'object') {
+        if (newValue && typeof newValue === "object") {
           dislikeCountSettings.enabled = newValue.enabled ?? true;
           applyDislikeCountState(dislikeCountSettings.enabled);
         }
@@ -285,10 +315,20 @@ storage.onChanged.addListener((changes, area) => {
         breakSettings.workUrl = newValue.workUrl;
       }
       if (changes.ytt_backup_settings) {
-        backupSettings = changes.ytt_backup_settings.newValue || {
-          enabled: true,
-          intervalHours: 24,
-          backupOnClose: true,
+        backupSettings = {
+          ...{
+            enabled: true,
+            intervalHours: 24,
+            backupOnClose: true,
+            maxBackups: 10,
+          },
+          ...(changes.ytt_backup_settings.newValue || {}),
+        };
+      }
+      if (changes.ytt_retention_settings) {
+        retentionSettings = {
+          ...{ duration: 7 },
+          ...(changes.ytt_retention_settings.newValue || {}),
         };
       }
 

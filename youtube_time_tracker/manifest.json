@@ -8,9 +8,9 @@
     "48": "icons/icon128.jpg",
     "128": "icons/icon128.jpg"
   },
-  "permissions": ["storage", "webNavigation", "alarms"],
+  "permissions": ["storage", "webNavigation", "alarms", "unlimitedStorage"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.js"
   },
   "host_permissions": ["*://*.youtube.com/*", "https://zenquotes.io/*", "https://returnyoutubedislikeapi.com/*"],
 

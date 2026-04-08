@@ -115,10 +115,51 @@ async function deleteBackup(id) {
     });
 }
 
+/**
+ * Deletes oldest backups if the count exceeds the limit.
+ * @param {number} limit - Maximum number of backups to keep.
+ * @returns {Promise<number>} - Number of deleted backups.
+ */
+async function purgeOldBackups(limit) {
+    if (!limit || limit <= 0) return 0;
+    
+    const backups = await getAllBackups();
+    if (backups.length <= limit) return 0;
+    
+    const toDelete = backups.slice(limit); // getAllBackups returns newest first, so slice from limit onwards
+    let deletedCount = 0;
+    
+    for (const b of toDelete) {
+        await deleteBackup(b.id);
+        deletedCount++;
+    }
+    
+    console.log(`DB: Purged ${deletedCount} old backups. Limit was ${limit}.`);
+    return deletedCount;
+}
+
+/**
+ * Deletes all backups from the database.
+ * @returns {Promise<void>}
+ */
+async function clearAllBackups() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.clear();
+
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
 // Make functions available globally in extension context
 self.yttDB = {
     addBackup,
     getAllBackups,
     getBackupById,
-    deleteBackup
+    deleteBackup,
+    purgeOldBackups,
+    clearAllBackups
 };

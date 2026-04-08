@@ -14,11 +14,22 @@ function getSidebarHTML() {
                 </div>
             </div>
             <div id="history-header-filters">
-                <div class="filter-chips">
-                    <button class="filter-chip active" data-filter="today">Today</button>
-                    <button class="filter-chip" data-filter="yesterday">Yesterday</button>
-                    <button class="filter-chip" data-filter="all">Last 7 Days</button>
+                <div class="date-navigator">
+                    <div class="nav-controls">
+                        <button id="date-prev" class="nav-arrow-btn" title="Previous Day">
+                            ${icons.prev}
+                        </button>
+                        <div id="calendar-trigger" class="date-display">
+                            <span class="current-date-label">Today</span>
+                            <span class="calendar-icon">${icons.calendar}</span>
+                        </div>
+                        <button id="date-next" class="nav-arrow-btn" title="Next Day">
+                            ${icons.next}
+                        </button>
+                    </div>
+                    <button class="filter-chip special" data-filter="all">All Time</button>
                 </div>
+                <div id="calendar-popover" class="calendar-popover" style="display: none;"></div>
             </div>
         </div>
         <div class="stats-body">
@@ -40,6 +51,10 @@ function getSidebarHTML() {
                 <div class="video-list-container">
                     <h3 id="history-title">Watch History (Today)</h3>
                     <ul id="video-history-list"></ul>
+                    <div id="history-loading" class="infinite-scroll-loader" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <span>Loading more activity...</span>
+                    </div>
                 </div>
             </div>
             <div id="analytics-view" style="display: none;">
@@ -139,6 +154,40 @@ function getSidebarHTML() {
                             </div>
                             <input type="text" id="setting-work-url" class="settings-text-input" value="${breakSettings.workUrl}" placeholder="https://google.com">
                         </div>
+                        <div class="settings-item vertical">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.history}</span>
+                                    <span class="settings-item-label">Data Retention</span>
+                                </div>
+                                <span class="settings-item-desc">How long to keep your watch history</span>
+                            </div>
+                            <div class="custom-dropdown" id="retention-duration-dropdown" data-value="${retentionSettings.duration}">
+                                <div class="dropdown-trigger">
+                                    <span>${
+                                      {
+                                        7: "7 Days",
+                                        15: "15 Days",
+                                        30: "30 Days",
+                                        90: "3 Months",
+                                        180: "6 Months",
+                                        365: "1 Year",
+                                        [-1]: "Unlimited",
+                                      }[retentionSettings.duration] || "7 Days"
+                                    }</span>
+                                    <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                                <div class="dropdown-menu">
+                                    <div class="dropdown-item ${retentionSettings.duration == 7 ? "active" : ""}" data-value="7">7 Days</div>
+                                    <div class="dropdown-item ${retentionSettings.duration == 15 ? "active" : ""}" data-value="15">15 Days</div>
+                                    <div class="dropdown-item ${retentionSettings.duration == 30 ? "active" : ""}" data-value="30">30 Days</div>
+                                    <div class="dropdown-item ${retentionSettings.duration == 90 ? "active" : ""}" data-value="90">3 Months</div>
+                                    <div class="dropdown-item ${retentionSettings.duration == 180 ? "active" : ""}" data-value="180">6 Months</div>
+                                    <div class="dropdown-item ${retentionSettings.duration == 365 ? "active" : ""}" data-value="365">1 Year</div>
+                                    <div class="dropdown-item ${retentionSettings.duration == -1 ? "active" : ""}" data-value="-1">Unlimited</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -214,15 +263,38 @@ function getSidebarHTML() {
                                 </div>
                             </div>
                         </div>
+                        <div class="settings-item vertical">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.backup}</span>
+                                    <span class="settings-item-label">Backups to Keep</span>
+                                </div>
+                                <span class="settings-item-desc">Maximum number of backups to store (1-50)</span>
+                            </div>
+                            <div class="interval-input-wrapper">
+                                <button class="interval-btn minus" id="max-backups-minus">−</button>
+                                <input type="number" id="max-backups-value" class="interval-value" value="${backupSettings.maxBackups || 10}" min="1" max="50">
+                                <button class="interval-btn plus" id="max-backups-plus">+</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="settings-section">
-                    <div class="section-header-row">
-                        <h4 class="section-title">Stored Backups</h4>
-                        <button id="create-manual-backup" class="small-action-btn">
-                            ${icons.backup} New Backup
-                        </button>
+                    <div class="section-header-row vertical">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;">
+                            <h4 class="section-title" style="margin-bottom: 0;">Stored Backups</h4>
+                            <button id="delete-all-backups" class="section-action-link danger">Clear All</button>
+                        </div>
+                        <div class="header-button-group full-width">
+                            <button id="import-backup-json" class="small-action-btn secondary">
+                                ${icons.download} Import JSON
+                            </button>
+                            <button id="create-manual-backup" class="small-action-btn">
+                                ${icons.backup} New Backup
+                            </button>
+                            <input type="file" id="backup-file-input" accept=".json" style="display: none;">
+                        </div>
                     </div>
                     <div class="backup-list-container">
                         <ul id="backup-history-list" class="backup-list">

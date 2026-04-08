@@ -19,15 +19,32 @@ function renderStats() {
         displayWatchTime = data.watchTime;
         displayVideos = data.videos;
         displayDuration = data.activeTime || 0;
-    } else {
+    } else if (selectedDayFilter === 'all') {
         Object.values(allHistory).forEach(day => {
             displayWatchTime += day.watchTime;
             displayVideos = displayVideos.concat(day.videos);
             displayDuration += (day.activeTime || 0);
         });
+    } else {
+        const data = allHistory[selectedDayFilter] || { watchTime: 0, activeTime: 0, videos: [], sessionStart: 0 };
+        displayWatchTime = data.watchTime;
+        displayVideos = data.videos;
+        displayDuration = data.activeTime || 0;
     }
 
+    const getDisplayTitle = () => {
+        if (selectedDayFilter === 'today') return 'Watch History (Today)';
+        if (selectedDayFilter === 'yesterday') return 'Watch History (Yesterday)';
+        if (selectedDayFilter === 'all') return 'Watch History (All Time)';
+        
+        const [y, m, d] = selectedDayFilter.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        return `History for ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`;
+    };
+
     if (activeView === 'history') {
+        const titleEl = document.getElementById('history-title');
+        if (titleEl) titleEl.textContent = getDisplayTitle();
         const durationEl = document.getElementById('session-duration');
         const watchTimeEl = document.getElementById('total-watch-time');
         const countEl = document.getElementById('videos-count');
@@ -57,76 +74,16 @@ function renderStats() {
 
             if (displayVideos.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; padding: 40px; color:#666;">No activity recorded for this period.</div>';
+                fullSortedVideos = [];
+                loadedVideoCount = 0;
             } else {
                 // Sort by lastUpdated descending (most recently active at the top)
-                const sortedVideos = displayVideos.slice().sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-                
-                listEl.innerHTML = sortedVideos.map(v => {
-
-                    const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
-                    const isActive = v.uid === currentUid;
-                    return `
-                        <li class="history-item ${isActive ? 'active-tab-video' : ''}" data-video-id="${v.id}" data-uid="${v.uid}" data-time="${Math.floor(v.currentPosition || 0)}">
-                            <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
-                            <div class="history-info">
-                                <div class="video-header-row">
-                                    <div style="flex: 1; min-width: 0;">
-                                        <span class="video-title" title="${v.title}">${v.title}</span>
-                                        <span class="video-channel">${v.channelName || ''}</span>
-                                    </div>
-                                    <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
-                                </div>
-                                <div class="video-meta">
-                                    <span class="time-readout">${formatTime(Math.round(v.currentPosition || 0))} / ${formatTime(Math.round(v.totalDuration))}</span>
-                                    <div class="watch-stats">
-                                        <div class="watched-badge">
-                                            <span>${formatTime(Math.round(v.watchedDuration))}</span>
-                                        </div>
-                                        <span class="video-percent">${percent}%</span>
-                                    </div>
-                                </div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar-fill" style="width: ${v.totalDuration > 0 ? Math.min(100, ((v.currentPosition || 0) / v.totalDuration) * 100) : 0}%"></div>
-                                </div>
-                            </div>
-                        </li>
-                    `;
-                }).join('');
-
-                // Re-bind handlers
-                listEl.querySelectorAll('.history-item').forEach(item => {
-                    item.onclick = (e) => {
-                        e.stopPropagation();
-                        const vid = item.dataset.videoId;
-                        const t = item.dataset.time;
-                        if (vid && vid !== 'undefined') {
-                            window.location.href = `https://www.youtube.com/watch?v=${vid}&t=${t}s`;
-                        }
-                    };
-                    const delBtn = item.querySelector('.delete-video-btn');
-                    if (delBtn) {
-                        delBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            const uid = item.dataset.uid;
-                            const videoTitle = item.querySelector('.video-title').textContent;
-
-                            showConfirmModal({
-                                title: 'Remove from History?',
-                                message: `Are you sure you want to remove "${videoTitle}" from your watch history?`,
-                                confirmText: 'Remove',
-                                cancelText: 'Cancel',
-                                icon: '🗑️',
-                                onConfirm: () => {
-                                    deleteHistoryVideo(uid);
-                                    lastVideoCount = -1; // Force rebuild
-                                    renderStats();
-                                }
-                            });
-                        };
-                    }
-                });
+                fullSortedVideos = displayVideos.slice().sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+                listEl.innerHTML = '';
+                loadedVideoCount = 0;
+                appendHistoryBatch();
             }
-        } else if (listEl) {
+        } else if (listEl && activeView === 'history') {
             // Incremental update for ALL videos (multi-tab sync)
             displayVideos.forEach(videoData => {
                 const item = listEl.querySelector(`.history-item[data-uid="${videoData.uid}"]`);
@@ -165,4 +122,99 @@ function renderStats() {
             renderAnalyticsView();
         }
     }
+}
+function appendHistoryBatch() {
+    const listEl = document.getElementById('video-history-list');
+    const loadingEl = document.getElementById('history-loading');
+    if (!listEl || isInfiniteScrolling || loadedVideoCount >= fullSortedVideos.length) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        return;
+    }
+
+    if (loadingEl) loadingEl.style.display = 'flex';
+    isInfiniteScrolling = true;
+
+    // Small delay to allow the spinner to show up (even though local render is fast)
+    setTimeout(() => {
+        const batch = fullSortedVideos.slice(loadedVideoCount, loadedVideoCount + historyPageSize);
+        const fragment = document.createDocumentFragment();
+        
+        batch.forEach(v => {
+            const li = document.createElement('li');
+            const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
+            const isActive = v.uid === currentUid;
+            
+            li.className = `history-item ${isActive ? 'active-tab-video' : ''}`;
+            li.dataset.videoId = v.id;
+            li.dataset.uid = v.uid;
+            li.dataset.time = Math.floor(v.currentPosition || 0);
+            
+            li.innerHTML = `
+                <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
+                <div class="history-info">
+                    <div class="video-header-row">
+                        <div style="flex: 1; min-width: 0;">
+                            <span class="video-title" title="${v.title}">${v.title}</span>
+                            <span class="video-channel">${v.channelName || ''}</span>
+                        </div>
+                        <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
+                    </div>
+                    <div class="video-meta">
+                        <span class="time-readout">${formatTime(Math.round(v.currentPosition || 0))} / ${formatTime(Math.round(v.totalDuration))}</span>
+                        <div class="watch-stats">
+                            <div class="watched-badge">
+                                <span>${formatTime(Math.round(v.watchedDuration))}</span>
+                            </div>
+                            <span class="video-percent">${percent}%</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" style="width: ${v.totalDuration > 0 ? Math.min(100, ((v.currentPosition || 0) / v.totalDuration) * 100) : 0}%"></div>
+                    </div>
+                </div>
+            `;
+
+            li.onclick = (e) => {
+                e.stopPropagation();
+                const vid = li.dataset.videoId;
+                const t = li.dataset.time;
+                if (vid && vid !== 'undefined') {
+                    window.location.href = `https://www.youtube.com/watch?v=${vid}&t=${t}s`;
+                }
+            };
+
+            const delBtn = li.querySelector('.delete-video-btn');
+            if (delBtn) {
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const uid = li.dataset.uid;
+                    const videoTitle = li.querySelector('.video-title').textContent;
+
+                    showConfirmModal({
+                        title: 'Remove from History?',
+                        message: `Are you sure you want to remove "${videoTitle}" from your watch history?`,
+                        confirmText: 'Remove',
+                        cancelText: 'Cancel',
+                        icon: '🗑️',
+                        onConfirm: () => {
+                            deleteHistoryVideo(uid);
+                            lastVideoCount = -1; // Force rebuild
+                            renderStats();
+                        }
+                    });
+                };
+            }
+            
+            fragment.appendChild(li);
+        });
+
+        listEl.appendChild(fragment);
+        loadedVideoCount += batch.length;
+        isInfiniteScrolling = false;
+        
+        // Hide loading indicator if no more videos
+        if (loadedVideoCount >= fullSortedVideos.length && loadingEl) {
+            loadingEl.style.display = 'none';
+        }
+    }, 100);
 }
