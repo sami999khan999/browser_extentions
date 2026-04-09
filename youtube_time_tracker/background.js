@@ -22,11 +22,14 @@ let backupSettings = {
 let retentionSettings = {
   duration: 7,
 };
+let dislikeCountSettings = { enabled: true };
 const youtubeTabs = new Set(); // Tracks active YouTube tabs for the "on close" backup
 
 // Global throttles for multi-tab time tracking
 let lastGlobalWatchUpdateTime = 0;
-let lastGlobalActiveUpdateTime = 0;
+let lastGlobalActiveUpdateTime = Date.now();
+let lastStorageWriteTime = 0;
+let pendingSaveTimeout = null;
 
 // Load initial state from storage
 const loadPromise = new Promise((resolve) => {
@@ -37,6 +40,7 @@ const loadPromise = new Promise((resolve) => {
       "ytt_break_settings",
       "ytt_backup_settings",
       "ytt_retention_settings",
+      "ytt_dislike_settings",
     ],
     (data) => {
       if (data.ytt_retention_settings)
@@ -59,6 +63,8 @@ const loadPromise = new Promise((resolve) => {
       if (data.ytt_break_settings) breakSettings = data.ytt_break_settings;
       if (data.ytt_backup_settings)
         backupSettings = { ...backupSettings, ...data.ytt_backup_settings };
+      if (data.ytt_dislike_settings)
+        dislikeCountSettings = { ...dislikeCountSettings, ...data.ytt_dislike_settings };
 
       scheduleAlarms();
       console.log("Background: State loaded and cleaned.");
@@ -293,16 +299,71 @@ function handleWatchTimeReport(data) {
   }
 
   // Track active usage time (heartbeat)
-  if (delta >= 0) {
-    const now = Date.now();
-    // Throttle global active usage to prevent double-counting
-    if (now - lastGlobalActiveUpdateTime >= 950) {
-      const activeDelta = delta > 0 ? delta : 1;
-      todayData.activeTime = (todayData.activeTime || 0) + activeDelta;
-      lastGlobalActiveUpdateTime = now;
-    }
+  const now = Date.now();
+  const timeSinceLastActiveUpdate = now - lastGlobalActiveUpdateTime;
+
+  // STRICT LINEAR TIME: Only add time if 1s+ has passed globally.
+  // We add 'timeSinceLastActiveUpdate' but cap it to 2s to avoid massive jumps 
+  // (e.g. if the computer sleeps or browser suspends background scripts).
+  if (timeSinceLastActiveUpdate >= 950) {
+    const linearDelta = Math.min(timeSinceLastActiveUpdate, 2000) / 1000;
+    todayData.activeTime = (todayData.activeTime || 0) + linearDelta;
+    lastGlobalActiveUpdateTime = now;
   }
 
+  // Live broadcast to all tabs for instant UI updates
+  broadcastHistoryToTabs();
+
+  // Throttled storage write to prevent performance bottlenecks
+  throttledSaveHistory();
+}
+
+/**
+ * Sends the current history to all open YouTube tabs for instant UI syncing.
+ */
+function broadcastHistoryToTabs() {
+  tabs.query({ url: "*://*.youtube.com/*" }, (allTabs) => {
+    allTabs.forEach((tab) => {
+      // Don't send if we don't have permission for this tab
+      if (!tab.url || !tab.url.includes("youtube.com")) return;
+      
+      try {
+        chrome.tabs.sendMessage(tab.id, { 
+          action: "HISTORY_UPDATE", 
+          allHistory: allHistory 
+        }, () => {
+          // Ignore errors (tab might be closed or not loaded yet)
+          if (chrome.runtime.lastError) {}
+        });
+      } catch (e) {}
+    });
+  });
+}
+
+/**
+ * Batches storage writes to reduce disk I/O when many tabs are open.
+ */
+function throttledSaveHistory() {
+  const now = Date.now();
+  
+  // If we haven't written in 5 seconds, do it now
+  if (now - lastStorageWriteTime > 5000) {
+    if (pendingSaveTimeout) {
+      clearTimeout(pendingSaveTimeout);
+      pendingSaveTimeout = null;
+    }
+    saveHistoryNow();
+  } else if (!pendingSaveTimeout) {
+    // Schedule a save if one isn't already pending
+    pendingSaveTimeout = setTimeout(() => {
+      pendingSaveTimeout = null;
+      saveHistoryNow();
+    }, 5000 - (now - lastStorageWriteTime));
+  }
+}
+
+function saveHistoryNow() {
+  lastStorageWriteTime = Date.now();
   storage.local.set({ ytt_history: allHistory });
 }
 
@@ -314,7 +375,8 @@ function handleSettingsUpdate(data) {
     breakSettings = data.settings;
     storage.local.set({ ytt_break_settings: breakSettings });
   } else if (data.type === "dislike") {
-    storage.local.set({ ytt_dislike_settings: data.settings });
+    dislikeCountSettings = data.settings;
+    storage.local.set({ ytt_dislike_settings: dislikeCountSettings });
   } else if (data.type === "backup") {
     backupSettings = data.settings;
     storage.local.set({ ytt_backup_settings: backupSettings });
@@ -376,6 +438,8 @@ async function createBackup() {
     shortsBlockerSettings,
     breakSettings,
     backupSettings,
+    retentionSettings,
+    dislikeCountSettings,
   };
   try {
     await self.yttDB.addBackup(data);
@@ -400,6 +464,8 @@ async function handleImportBackup(data) {
       shortsBlockerSettings = data.shortsBlockerSettings;
     if (data.breakSettings) breakSettings = data.breakSettings;
     if (data.backupSettings) backupSettings = data.backupSettings;
+    if (data.retentionSettings) retentionSettings = data.retentionSettings;
+    if (data.dislikeCountSettings) dislikeCountSettings = data.dislikeCountSettings;
 
     // Save to storage
     const saveObj = {
@@ -407,6 +473,8 @@ async function handleImportBackup(data) {
       ytt_shorts_settings: shortsBlockerSettings,
       ytt_break_settings: breakSettings,
       ytt_backup_settings: backupSettings,
+      ytt_retention_settings: retentionSettings,
+      ytt_dislike_settings: dislikeCountSettings,
     };
 
     await new Promise((resolve, reject) => {

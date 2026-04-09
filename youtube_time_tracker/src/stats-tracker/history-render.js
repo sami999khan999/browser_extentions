@@ -19,6 +19,19 @@ function renderStats() {
         displayWatchTime = data.watchTime;
         displayVideos = data.videos;
         displayDuration = data.activeTime || 0;
+    } else if (selectedDayFilter.endsWith('days')) {
+        // Range-based filtering: today, yesterday, 7days, 15days, 30days, etc.
+        const daysToInclude = parseInt(selectedDayFilter);
+        for (let i = 0; i < daysToInclude; i++) {
+            const date = new Date(now.getTime() - i * 86400000);
+            const key = getDayKey(date);
+            const dayData = allHistory[key];
+            if (dayData) {
+                displayWatchTime += dayData.watchTime;
+                displayVideos = displayVideos.concat(dayData.videos);
+                displayDuration += (dayData.activeTime || 0);
+            }
+        }
     } else if (selectedDayFilter === 'all') {
         Object.values(allHistory).forEach(day => {
             displayWatchTime += day.watchTime;
@@ -35,6 +48,10 @@ function renderStats() {
     const getDisplayTitle = () => {
         if (selectedDayFilter === 'today') return 'Watch History (Today)';
         if (selectedDayFilter === 'yesterday') return 'Watch History (Yesterday)';
+        if (selectedDayFilter.endsWith('days')) {
+            const days = parseInt(selectedDayFilter);
+            return `Watch History (Last ${days} Days)`;
+        }
         if (selectedDayFilter === 'all') return 'Watch History (All Time)';
         
         const [y, m, d] = selectedDayFilter.split('-').map(Number);
@@ -88,31 +105,63 @@ function renderStats() {
             displayVideos.forEach(videoData => {
                 const item = listEl.querySelector(`.history-item[data-uid="${videoData.uid}"]`);
                 if (item) {
-                    // Update highlighting if it changed
                     const isActive = videoData.uid === currentUid;
                     item.classList.toggle('active-tab-video', isActive);
                     
-                    // If active AND not already the first child, move it to the top
-                    if (isActive && item.previousElementSibling) {
-                        listEl.prepend(item);
-                    }
+                    // Re-order logic: Prioritize the video playing in the CURRENT tab.
+                    if (item.previousElementSibling) {
+                        const firstChild = listEl.firstElementChild;
+                        const firstUid = firstChild ? firstChild.dataset.uid : null;
 
+                        if (isActive) {
+                            // If this is the current tab's video, it MUST be at the top.
+                            listEl.prepend(item);
+                        } else if (firstUid !== currentUid) {
+                            // Only allow other active videos to move if the current top is NOT 
+                            // the local active video. This ensures the current tab's video stays on top.
+                            const isRecentlyActive = videoData.lastUpdated && (Date.now() - videoData.lastUpdated < 5000);
+                            const firstVideo = displayVideos.find(v => v.uid === firstUid);
+                            
+                            if (isRecentlyActive && (!firstVideo || videoData.lastUpdated > (firstVideo.lastUpdated || 0))) {
+                                listEl.prepend(item);
+                            }
+                        }
+                    }
 
                     const timeEl = item.querySelector('.time-readout');
                     const percentEl = item.querySelector('.video-percent');
                     const progressBar = item.querySelector('.progress-bar-fill');
                     const percent = videoData.totalDuration > 0 ? Math.round((videoData.watchedDuration / videoData.totalDuration) * 100) : 0;
                     
-                    if (timeEl) timeEl.textContent = `${formatTime(Math.round(videoData.currentPosition || 0))} / ${formatTime(Math.round(videoData.totalDuration))}`;
-                    if (percentEl) {
-                        percentEl.closest('.watch-stats').querySelector('.watched-badge span').textContent = formatTime(Math.round(videoData.watchedDuration));
-                        percentEl.textContent = `${percent}%`;
+                    const newTimeText = `${formatTime(Math.round(videoData.currentPosition || 0))} / ${formatTime(Math.round(videoData.totalDuration))}`;
+                    if (timeEl && timeEl.textContent !== newTimeText) {
+                        timeEl.textContent = newTimeText;
                     }
+
+                    if (percentEl) {
+                        const watchedTimeText = formatTime(Math.round(videoData.watchedDuration));
+                        const watchedBadgeSpan = percentEl.closest('.watch-stats').querySelector('.watched-badge span');
+                        if (watchedBadgeSpan && watchedBadgeSpan.textContent !== watchedTimeText) {
+                            watchedBadgeSpan.textContent = watchedTimeText;
+                        }
+
+                        const percentText = `${percent}%`;
+                        if (percentEl.textContent !== percentText) {
+                            percentEl.textContent = percentText;
+                        }
+                    }
+
                     if (progressBar) {
                         const barPercent = videoData.totalDuration > 0 ? Math.min(100, ((videoData.currentPosition || 0) / videoData.totalDuration) * 100) : 0;
-                        progressBar.style.width = `${barPercent}%`;
+                        const newWidth = `${barPercent}%`;
+                        if (progressBar.style.width !== newWidth) {
+                            progressBar.style.width = newWidth;
+                        }
                     }
-                    item.dataset.time = Math.floor(videoData.currentPosition || 0);
+                    const newPos = Math.floor(videoData.currentPosition || 0);
+                    if (item.dataset.time !== String(newPos)) {
+                        item.dataset.time = newPos;
+                    }
                 }
             });
         }

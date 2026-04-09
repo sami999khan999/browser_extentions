@@ -185,6 +185,17 @@ function safeStorageGet(keys, callback) {
   }
 }
 
+// Runtime message listener for instant syncing
+runtime.onMessage.addListener((request) => {
+  if (request.action === "HISTORY_UPDATE") {
+    allHistory = request.allHistory;
+    // Only re-render if the stats panel is actually open
+    if (isStatsOpen) {
+      renderStats();
+    }
+  }
+});
+
 /**
  * Safely writes to storage.local.
  * Handles context invalidation.

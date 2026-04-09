@@ -12,8 +12,11 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       label.textContent = "Today";
     } else if (selectedDayFilter === "yesterday") {
       label.textContent = "Yesterday";
+    } else if (selectedDayFilter.endsWith("days")) {
+      const days = parseInt(selectedDayFilter, 10);
+      label.textContent = `Last ${days} Days`;
     } else if (selectedDayFilter === "all") {
-      label.textContent = "All Time";
+      label.textContent = "All History";
     } else {
       // YYYY-MM-DD format
       const [y, m, d] = selectedDayFilter.split("-").map(Number);
@@ -25,10 +28,23 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       });
     }
     
-    // Update "All Time" chip active state
-    const allTimeChip = sidebar.querySelector('.filter-chip.special');
-    if (allTimeChip) {
-        allTimeChip.classList.toggle('active', selectedDayFilter === 'all');
+    // Update history dropdown label
+    const historyDropdown = document.getElementById("history-period-dropdown");
+    if (historyDropdown) {
+        historyDropdown.dataset.value = selectedDayFilter;
+        const activeItem = historyDropdown.querySelector(`.dropdown-item[data-value="${selectedDayFilter}"]`);
+        if (activeItem) {
+            historyDropdown.querySelector('.dropdown-trigger span').textContent = activeItem.textContent;
+            historyDropdown.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+            activeItem.classList.add('active');
+        } else if (!selectedDayFilter.includes('-')) {
+             // If it's a preset but we don't have an item (e.g. customized), default label
+             historyDropdown.querySelector('.dropdown-trigger span').textContent = label.textContent;
+        } else {
+             // It's a specific date from calendar
+             historyDropdown.querySelector('.dropdown-trigger span').textContent = "Custom Date";
+             historyDropdown.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+        }
     }
   };
 
@@ -133,12 +149,19 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
   const shiftDate = (offset) => {
     let current;
-    if (selectedDayFilter === "today") current = new Date();
-    else if (selectedDayFilter === "yesterday") current = new Date(Date.now() - 86400000);
-    else if (selectedDayFilter === "all") current = new Date();
-    else {
-      const [y, m, d] = selectedDayFilter.split("-").map(Number);
-      current = new Date(y, m - 1, d);
+    if (selectedDayFilter === "today") {
+      current = new Date();
+    } else if (selectedDayFilter === "yesterday") {
+      current = new Date(Date.now() - 86400000);
+    } else if (selectedDayFilter === "all" || selectedDayFilter.endsWith("days")) {
+      current = new Date();
+    } else {
+      const parts = selectedDayFilter.split("-").map(Number);
+      if (parts.length === 3 && !parts.some(isNaN)) {
+        current = new Date(parts[0], parts[1] - 1, parts[2]);
+      } else {
+        current = new Date();
+      }
     }
     current.setDate(current.getDate() + offset);
     
@@ -151,15 +174,64 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); shiftDate(-1); };
   if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); shiftDate(1); };
 
-  const allTimeChip = sidebar.querySelector('.filter-chip.special');
-  if (allTimeChip) {
-    allTimeChip.onclick = (e) => {
+  // History Period Dropdown Logic
+  const histDropdown = document.getElementById("history-period-dropdown");
+  if (histDropdown) {
+    const trigger = histDropdown.querySelector(".dropdown-trigger");
+    const items = histDropdown.querySelectorAll(".dropdown-item");
+
+    trigger.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = histDropdown.classList.contains("open");
+      document.querySelectorAll(".custom-dropdown.open").forEach((d) => {
+        if (d !== histDropdown) d.classList.remove("open");
+      });
+      histDropdown.classList.toggle("open");
+    };
+
+    items.forEach((item) => {
+      item.onclick = (e) => {
         e.stopPropagation();
-        selectedDayFilter = 'all';
+        selectedDayFilter = item.dataset.value;
+        histDropdown.classList.remove("open");
         updateDateLabel();
         renderStats();
-    };
+      };
+    });
   }
+
+  // Function to sync history presets with data retention settings
+  const syncHistoryPresets = () => {
+    const dropdown = document.getElementById("history-period-dropdown");
+    if (!dropdown) return;
+    
+    const duration = retentionSettings.duration;
+    const items = dropdown.querySelectorAll(".dropdown-item");
+    
+    items.forEach(item => {
+        const val = item.dataset.value;
+        if (val === 'today' || val === 'yesterday' || val === 'all') {
+            item.style.display = 'block';
+            return;
+        }
+        
+        const days = parseInt(val, 10);
+        if (duration === -1 || days <= duration) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+
+    // Update Special chip label
+    const specialItem = dropdown.querySelector('.dropdown-item.special');
+    if (specialItem) {
+        specialItem.textContent = duration === -1 ? "Unlimited History" : (duration + " Days History");
+    }
+  };
+
+  // Initial sync
+  syncHistoryPresets();
 
   // Initial label update
   updateDateLabel();
@@ -178,9 +250,16 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     if (sView) sView.style.display = viewName === "settings" ? "block" : "none";
     if (hFilters)
       hFilters.style.display = viewName === "history" ? "block" : "none";
+    
+    const toggleStrip = document.getElementById("history-filter-toggle");
+    if (toggleStrip)
+      toggleStrip.style.display = viewName === "history" ? "flex" : "none";
 
     const bView = document.getElementById("backup-view");
     if (bView) bView.style.display = viewName === "backup" ? "block" : "none";
+
+    const cPopover = document.getElementById("calendar-popover");
+    if (cPopover) cPopover.style.display = "none";
 
     // Update Button Active States
     ["nav-history", "nav-analytics", "nav-backup", "nav-settings"].forEach((id) => {
@@ -394,6 +473,11 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
         items.forEach((i) => i.classList.remove("active"));
         item.classList.add("active");
 
+        // Sync history filters
+        if (typeof syncHistoryPresets === 'function') {
+            syncHistoryPresets();
+        }
+
         // Close
         retentionDropdown.classList.remove("open");
       };
@@ -521,13 +605,21 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
                       importBtn.style.color = "";
                    }, 2000);
                 } else {
-                   alert("Failed to import backup: " + (response ? response.error : "Unknown error"));
+                    showAlertModal({
+                        title: "Import Failed",
+                        message: response ? response.error : "Unknown error occurred during import.",
+                        icon: "❌"
+                    });
                 }
               });
             }
           });
         } catch (err) {
-          alert("Error parsing backup file: " + err.message);
+          showAlertModal({
+              title: "Invalid File",
+              message: "The selected file is not a valid YouTube Time Tracker backup. Please check the JSON format.",
+              icon: "⚠️"
+          });
           fileInput.value = "";
         }
       };
@@ -601,6 +693,63 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
         },
       });
     };
+  }
+
+  // Filter Section Toggle Logic
+  const toggleBtn = document.getElementById("toggle-filter-btn");
+  const subheader = document.getElementById("history-header-filters");
+  const toggleStrip = document.getElementById("history-filter-toggle");
+
+  if (toggleBtn && subheader) {
+    const toggleFilters = (forceState) => {
+        const isCollapsed = subheader.classList.contains("collapsed");
+        const shouldCollapse = forceState !== undefined ? !forceState : !isCollapsed;
+        
+        subheader.classList.toggle("collapsed", shouldCollapse);
+        toggleBtn.classList.toggle("expanded", !shouldCollapse);
+        
+        // Update icon based on state
+        toggleBtn.innerHTML = shouldCollapse ? icons.chevron_down : icons.chevron_up;
+    };
+
+    toggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleFilters();
+    };
+
+    // "Drag down" feel - simple version: click on strip also toggles
+    if (toggleStrip) {
+        let startY = 0;
+        toggleStrip.onmousedown = (e) => {
+            startY = e.clientY;
+            
+            const onMouseMove = (moveEvent) => {
+                const dy = moveEvent.clientY - startY;
+                if (dy > 20) { // Dragged down enough
+                    toggleFilters(true); // Expand
+                    cleanup();
+                } else if (dy < -20) { // Dragged up enough
+                    toggleFilters(false); // Collapse
+                    cleanup();
+                }
+            };
+            
+            const cleanup = () => {
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", cleanup);
+            };
+            
+            document.addEventListener("mousemove", onMouseMove);
+            document.addEventListener("mouseup", cleanup);
+        };
+        
+        // Also allow clicking the strip itself to toggle
+        toggleStrip.onclick = (e) => {
+            if (e.target === toggleStrip) {
+                toggleFilters();
+            }
+        };
+    }
   }
 
   // Toggle sidebar open/close
@@ -683,6 +832,10 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   sidebar.onmouseleave = () => {
     if (!isStatsOpen) document.body.style.overflow = "";
   };
+
+  // Initial UI sync
+  switchView(activeView);
+  updateDateLabel();
 }
 
 /**

@@ -91,6 +91,60 @@ function showConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
 }
 
 /**
+ * showAlertModal - Reusable accessible alert dialog (One button)
+ * 
+ * @param {Object} options 
+ *   - title: Modal title
+ *   - message: Modal message/body
+ *   - buttonText: Text for the close button
+ *   - icon: Emoji or icon HTML
+ */
+function showAlertModal({ title, message, buttonText = 'Got it', icon = '⚠️' }) {
+    if (document.getElementById('stats-confirm-modal')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'stats-confirm-modal'; // Reuse same overlay ID for styling
+    overlay.className = 'stats-modal-overlay';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    overlay.innerHTML = `
+        <div class="stats-modal">
+            <span class="stats-modal-icon">${icon}</span>
+            <h2 class="stats-modal-title">${title}</h2>
+            <p class="stats-modal-message">${message}</p>
+            <div class="stats-modal-actions single">
+                <button id="modal-ok" class="modal-btn premium-primary" style="width: 100%">${buttonText}</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const okBtn = document.getElementById('modal-ok');
+    const dismiss = () => {
+        overlay.classList.remove('visible');
+        document.body.style.overflow = '';
+        setTimeout(() => overlay.remove(), 300);
+    };
+
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    setTimeout(() => okBtn.focus(), 100);
+
+    okBtn.onclick = (e) => {
+        e.stopPropagation();
+        dismiss();
+    };
+    overlay.onclick = (e) => {
+        if (e.target === overlay) dismiss();
+    };
+    overlay.onkeydown = (e) => {
+        if (e.key === 'Escape' || e.key === 'Enter') dismiss();
+    };
+}
+
+/**
  * showMultiTabToast - A beautiful floating banner warning about multiple tabs playing
  * 
  * @param {number} otherTabId - The ID of the other tab to close
