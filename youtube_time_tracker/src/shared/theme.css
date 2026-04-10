@@ -1,12 +1,12 @@
 /* === Theme Variables === */
 :root {
-    --stats-primary: #FF0033;
+    --stats-primary: #e11d48;
     --stats-bg: #ffffff;
     --stats-sidebar-bg: #ffffff;
     --stats-text-primary: #0f0f0f;
     --stats-text-secondary: #606060;
     --stats-card-bg: #ffffff;
-    --stats-card-accent-bg: rgba(255, 0, 51, 0.05); /* Adjusted to match FF0033 */
+    --stats-card-accent-bg: rgba(225, 29, 72, 0.05); /* Adjusted to match e11d48 */
     --stats-border: rgba(0, 0, 0, 0.1);
     --stats-glass-bg: rgba(255, 255, 255, 0.7);
     --stats-glass-border: rgba(0, 0, 0, 0.1);
@@ -32,13 +32,13 @@
 }
 
 html[dark], [dark] {
-    --stats-primary: #FF0033;
+    --stats-primary: #e11d48;
     --stats-bg: #0f0f0f;
     --stats-sidebar-bg: rgba(15, 15, 15, 0.95);
     --stats-text-primary: #ffffff;
     --stats-text-secondary: #aaaaaa;
     --stats-card-bg: #0f0f0f;
-    --stats-card-accent-bg: linear-gradient(135deg, rgba(255, 0, 51, 0.1), rgba(255, 0, 51, 0.05));
+    --stats-card-accent-bg: linear-gradient(135deg, rgba(225, 29, 72, 0.1), rgba(225, 29, 72, 0.05));
     --stats-border: rgba(255, 255, 255, 0.1);
     --stats-glass-bg: rgba(28, 28, 28, 0.4);
     --stats-glass-border: rgba(255, 255, 255, 0.1);

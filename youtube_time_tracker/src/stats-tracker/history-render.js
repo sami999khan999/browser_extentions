@@ -166,8 +166,9 @@ function renderStats() {
             });
         }
     } else {
-        if (activeView !== lastRenderedView) {
+        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
             lastRenderedView = activeView;
+            lastRenderedFilter = selectedDayFilter;
             renderAnalyticsView();
         }
     }

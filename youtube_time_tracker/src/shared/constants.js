@@ -57,13 +57,13 @@ ytd-mini-guide-entry-renderer a[href*="/shorts"] {
 `;
 
 const dayColors = [
-    '#FF0033', // Today (Revised Primary)
-    '#ff8a00', // -1
-    '#ffc700', // -2
-    '#00e000', // -3
-    '#00c2ff', // -4
-    '#7000ff', // -5
-    '#ff00c7'  // -6
+    '#e11d48', // Today (Muted Red)
+    '#ea580c', // -1 (Muted Orange)
+    '#ca8a04', // -2 (Muted Yellow)
+    '#16a34a', // -3 (Muted Green)
+    '#0284c7', // -4 (Muted Blue)
+    '#7c3aed', // -5 (Muted Purple)
+    '#db2777'  // -6 (Muted Pink)
 ];
 
 const icons = {

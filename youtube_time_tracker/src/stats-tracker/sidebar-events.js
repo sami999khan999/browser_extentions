@@ -242,18 +242,18 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     const hView = document.getElementById("history-view");
     const aView = document.getElementById("analytics-view");
     const sView = document.getElementById("settings-view");
-    const hFilters = document.getElementById("history-header-filters");
+    const hFilters = document.getElementById("stats-header-filters");
 
     if (hView) hView.style.display = viewName === "history" ? "block" : "none";
     if (aView)
       aView.style.display = viewName === "analytics" ? "block" : "none";
     if (sView) sView.style.display = viewName === "settings" ? "block" : "none";
     if (hFilters)
-      hFilters.style.display = viewName === "history" ? "block" : "none";
+      hFilters.style.display = (viewName === "history" || viewName === "analytics") ? "block" : "none";
     
     const toggleStrip = document.getElementById("history-filter-toggle");
     if (toggleStrip)
-      toggleStrip.style.display = viewName === "history" ? "flex" : "none";
+      toggleStrip.style.display = (viewName === "history" || viewName === "analytics") ? "flex" : "none";
 
     const bView = document.getElementById("backup-view");
     if (bView) bView.style.display = viewName === "backup" ? "block" : "none";
@@ -697,7 +697,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
   // Filter Section Toggle Logic
   const toggleBtn = document.getElementById("toggle-filter-btn");
-  const subheader = document.getElementById("history-header-filters");
+  const subheader = document.getElementById("stats-header-filters");
   const toggleStrip = document.getElementById("history-filter-toggle");
 
   if (toggleBtn && subheader) {

@@ -14,7 +14,7 @@ function getSidebarHTML() {
                 </div>
             </div>
         </div>
-        <div id="history-header-filters" class="stats-subheader collapsed" style="display: none;">
+        <div id="stats-header-filters" class="stats-subheader collapsed" style="display: none;">
             <div class="filter-toolbar">
                 <div class="date-nav-group">
                     <button id="date-prev" class="nav-arrow-btn" title="Previous Day">
@@ -81,31 +81,96 @@ function getSidebarHTML() {
                 </div>
             </div>
             <div id="analytics-view" style="display: none;">
-                <div class="analytics-section">
-                    <div class="section-header">
-                        <span class="section-icon">${icons.analytics}</span>
-                        <h3>7-Day Trends</h3>
+                <div class="analytics-dashboard">
+                    <div class="stat-card glass">
+                        <span class="stat-label">Total Period Watch</span>
+                        <span id="analytics-total-time">0h 0m</span>
                     </div>
-                    <div id="stats-chart"></div>
+                    <div class="stat-card glass">
+                        <span class="stat-label">Daily Average</span>
+                        <span id="analytics-avg-time">0h 0m</span>
+                    </div>
                 </div>
-                
+
                 <div class="analytics-section">
                     <div class="section-header">
-                        <span class="section-icon">${icons.history}</span>
-                        <h3>Watch Distribution</h3>
+                        <div class="header-main">
+                           <span class="section-icon">${icons.analytics}</span>
+                           <h3>Watch Trends</h3>
+                        </div>
+                        <span id="trends-period-label" class="header-period-tag">Last 7 Days</span>
                     </div>
-                    <div class="pie-layout">
-                        <div id="pie-chart"></div>
-                        <div id="pie-legend"></div>
+                    <div class="chart-container-outer">
+                        <div class="chart-scroll-arrow left" id="chart-scroll-left">
+                            ${icons.prev}
+                        </div>
+                        <div class="chart-scroll-track" id="chart-scroll-track">
+                            <div id="stats-chart" class="main-bar-chart"></div>
+                        </div>
+                        <div class="chart-scroll-arrow right" id="chart-scroll-right">
+                            ${icons.next}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-section">
+                    <div class="section-header">
+                        <div class="header-main">
+                            <span class="section-icon">${icons.history}</span>
+                            <h3>Watch Distribution</h3>
+                        </div>
+                    </div>
+                    <div class="pie-layout-modern">
+                        <div class="pie-chart-wrapper">
+                            <div id="pie-chart"></div>
+                            <div class="pie-center-info">
+                                <span id="pie-total-label">Total</span>
+                                <span id="pie-total-value">0h</span>
+                            </div>
+                        </div>
+                        <div id="pie-legend" class="modern-legend"></div>
+                    </div>
+                </div>
+
+                <div class="analytics-section">
+                    <div class="section-header">
+                        <div class="header-main">
+                            <span class="section-icon">${icons.calendar}</span>
+                            <h3>Activity Heatmap</h3>
+                        </div>
+                        <div class="heatmap-legend">
+                            <span>Less</span>
+                            <div class="legend-cells">
+                                <div class="cell level-0"></div>
+                                <div class="cell level-1"></div>
+                                <div class="cell level-2"></div>
+                                <div class="cell level-3"></div>
+                                <div class="cell level-4"></div>
+                            </div>
+                            <span>More</span>
+                        </div>
+                    </div>
+                    <div class="heatmap-container-outer">
+                        <div class="chart-scroll-arrow left" id="heatmap-scroll-left">
+                            ${icons.prev}
+                        </div>
+                        <div id="activity-heatmap" class="heatmap-scroll-track">
+                            <div class="loading-placeholder">Generating heatmap...</div>
+                        </div>
+                        <div class="chart-scroll-arrow right" id="heatmap-scroll-right">
+                            ${icons.next}
+                        </div>
                     </div>
                 </div>
 
                 <div class="analytics-section no-border">
                     <div class="section-header">
-                        <span class="section-icon">${icons.analytics}</span>
-                        <h3>Key Insights</h3>
+                        <div class="header-main">
+                            <span class="section-icon">${icons.analytics}</span>
+                            <h3>Key Insights</h3>
+                        </div>
                     </div>
-                    <div id="key-insights" class="insights-container"></div>
+                    <div id="key-insights" class="insights-grid"></div>
                 </div>
             </div>
 

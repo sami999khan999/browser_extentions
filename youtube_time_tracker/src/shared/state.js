@@ -141,7 +141,8 @@ function safeSendMessage(message, callback) {
           // Ignore common harmless errors during reload/unload
           if (
             errorMsg.includes("context invalidated") ||
-            errorMsg.includes("message port closed")
+            errorMsg.includes("message port closed") ||
+            errorMsg.includes("Receiving end does not exist")
           ) {
             return;
           }
