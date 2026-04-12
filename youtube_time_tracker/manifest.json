@@ -18,15 +18,7 @@
     {
       "matches": ["*://*.youtube.com/*"],
       "css": [
-        "src/shared/theme.css",
-        "src/shared/modal.css",
-        "src/stats-tracker/toggle-button.css",
-        "src/stats-tracker/sidebar.css",
-        "src/stats-tracker/dashboard.css",
-        "src/stats-tracker/charts.css",
-        "src/settings/settings.css",
-        "src/break-reminder/break-modal.css",
-        "src/init/responsive.css"
+        "dist/content.css"
       ],
       "js": ["dist/content.js"],
       "run_at": "document_start"

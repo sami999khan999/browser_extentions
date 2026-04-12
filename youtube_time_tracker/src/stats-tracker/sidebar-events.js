@@ -1,52 +1,250 @@
 // === Sidebar Event Bindings: Filters, navigation, settings, open/close ===
 
+/**
+ * Global view switcher accessible from all modules
+ */
+let viewHistory = ['history']; // Navigation stack
+
+/**
+ * Synchronizes all UI controls (toggles, inputs, dropdowns) with the current 
+ * in-memory global state variables. Used for instant updates after backup restores.
+ */
+function syncSettingsUI() {
+    // 0. Syncing based on current selectedDayFilter (no forced reset to 'today' here)
+
+    // 1. Toggles
+    const shortsToggle = document.getElementById("shorts-blocker-toggle");
+    if (shortsToggle) shortsToggle.checked = shortsBlockerSettings.enabled;
+
+    const dislikeToggle = document.getElementById("dislike-count-toggle");
+    if (dislikeToggle) dislikeToggle.checked = dislikeCountSettings.enabled;
+
+    const breakToggle = document.getElementById("break-enabled-toggle");
+    if (breakToggle) breakToggle.checked = breakSettings.enabled;
+
+    const backupEnabledToggle = document.getElementById("backup-enabled-toggle");
+    if (backupEnabledToggle) backupEnabledToggle.checked = backupSettings.enabled;
+
+    const backupOnCloseToggle = document.getElementById("backup-on-close-toggle");
+    if (backupOnCloseToggle) backupOnCloseToggle.checked = backupSettings.backupOnClose;
+
+    // 2. Numeric & Text Inputs
+    const intervalValue = document.getElementById("interval-value");
+    if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
+
+    const workUrlInput = document.getElementById("setting-work-url");
+    if (workUrlInput) workUrlInput.value = breakSettings.workUrl;
+
+    const maxBackupsValue = document.getElementById("max-backups-value");
+    if (maxBackupsValue) maxBackupsValue.value = backupSettings.maxBackups || 10;
+
+    // 3. Custom Dropdowns
+    const syncDropdown = (id, value, map) => {
+        const dropdown = document.getElementById(id);
+        if (!dropdown) return;
+        dropdown.dataset.value = value;
+        const triggerSpan = dropdown.querySelector(".dropdown-trigger span");
+        if (triggerSpan) {
+          triggerSpan.textContent = map[value] || (value + " Days");
+        }
+        
+        const items = dropdown.querySelectorAll(".dropdown-item");
+        items.forEach(item => {
+            item.classList.toggle("active", String(item.dataset.value) === String(value));
+        });
+    };
+
+    syncDropdown("backup-interval-dropdown", backupSettings.intervalHours, {
+        1: "Every Hour", 6: "Every 6 Hours", 12: "Every 12 Hours", 24: "Every Day", 168: "Every Week"
+    });
+
+    syncDropdown("retention-duration-dropdown", retentionSettings.duration, {
+        7: "7 Days", 15: "15 Days", 30: "30 Days", 90: "3 Months", 180: "6 Months", 365: "1 Year", "-1": "Unlimited"
+    });
+
+    syncDropdown("history-period-dropdown", selectedDayFilter, {});
+
+    // 4. Special internal UI syncs
+    if (typeof syncHistoryPresets === 'function') syncHistoryPresets();
+    if (typeof updateDateLabel === 'function') updateDateLabel();
+}
+
+/**
+ * Formats a date or preset label for the UI (e.g., "Apr 7, 2026", "Today", or "Last 30 Days").
+ */
+const formatDateLabel = (value) => {
+    const map = {
+        "today": "Today", "yesterday": "Yesterday", "7days": "Last 7 Days", "15days": "Last 15 Days", 
+        "30days": "Last 30 Days", "90days": "Last 3 Months", "180days": "Last 6 Months", "365days": "Last Year", "all": "All Time"
+    };
+
+    if (map[value]) return map[value];
+
+    // Check if it's a specific date YYYY-MM-DD
+    const parts = String(value).split("-").map(Number);
+    if (parts.length === 3 && !parts.some(isNaN)) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        return d.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+    }
+
+    if (String(value).endsWith("days")) {
+        return `Last ${parseInt(value, 10)} Days`;
+    }
+
+    return value;
+};
+
+/**
+ * Updates the current date label in the history view and synchronizes the period dropdown.
+ */
+const updateDateLabel = () => {
+    const formatted = formatDateLabel(selectedDayFilter);
+    
+    // 1. Update side navigation label
+    const sideLabel = document.querySelector(".current-date-label");
+    if (sideLabel) sideLabel.textContent = formatted;
+
+    // 2. Update period dropdown trigger text
+    const histDropdown = document.getElementById("history-period-dropdown");
+    if (histDropdown) {
+        histDropdown.dataset.value = selectedDayFilter;
+        const triggerSpan = histDropdown.querySelector(".dropdown-trigger span");
+        if (triggerSpan) {
+            // Mapping for dropdown specific labels (e.g. "All History" instead of "All Time")
+            const dropdownLabels = { "all": "All History" };
+            triggerSpan.textContent = dropdownLabels[selectedDayFilter] || formatted;
+        }
+
+        // Update active class on items
+        const items = histDropdown.querySelectorAll(".dropdown-item");
+        items.forEach(item => {
+            item.classList.toggle("active", String(item.dataset.value) === String(selectedDayFilter));
+        });
+    }
+};
+
+/**
+ * Syncs the history period dropdown items with data retention settings.
+ */
+const syncHistoryPresets = () => {
+    const dropdown = document.getElementById("history-period-dropdown");
+    if (!dropdown) return;
+    
+    const duration = retentionSettings.duration;
+    const items = dropdown.querySelectorAll(".dropdown-item");
+    
+    items.forEach(item => {
+        const val = item.dataset.value;
+        if (val === 'today' || val === 'yesterday' || val === 'all') {
+            item.style.display = 'block';
+            return;
+        }
+        
+        const days = parseInt(val, 10);
+        if (duration === -1 || days <= duration) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+
+    // Update Special chip label
+    const specialItem = dropdown.querySelector('.dropdown-item.special');
+    if (specialItem) {
+        specialItem.textContent = duration === -1 ? "Unlimited History" : (duration + " Days History");
+    }
+};
+
+
+
+function switchView(viewName) {
+    // Push to history stack (avoid duplicates at top)
+    if (viewHistory[viewHistory.length - 1] !== viewName) {
+        viewHistory.push(viewName);
+        // Keep stack manageable
+        if (viewHistory.length > 20) viewHistory.shift();
+    }
+    _switchViewInternal(viewName);
+}
+
+function _switchViewInternal(viewName) {
+    activeView = viewName;
+    const hView = document.getElementById("history-view");
+    const aView = document.getElementById("analytics-view");
+    const sView = document.getElementById("settings-view");
+    const hFilters = document.getElementById("stats-header-filters");
+
+    if (hView) hView.style.display = viewName === "history" ? "block" : "none";
+    if (aView)
+      aView.style.display = viewName === "analytics" ? "block" : "none";
+    if (sView) sView.style.display = viewName === "settings" ? "block" : "none";
+    if (hFilters)
+      hFilters.style.display = "block";
+    
+    const toggleStrip = document.getElementById("history-filter-toggle");
+    if (toggleStrip)
+      toggleStrip.style.display = "flex";
+
+    const bView = document.getElementById("backup-view");
+    if (bView) bView.style.display = viewName === "backup" ? "block" : "none";
+
+    const cdView = document.getElementById("channel-distribution-view");
+    if (cdView) cdView.style.display = viewName === "channel-distribution" ? "block" : "none";
+
+    const cPopover = document.getElementById("calendar-popover");
+    if (cPopover) cPopover.style.display = "none";
+
+    // Update universal view title bar
+    const viewTitleMap = {
+        "history": "Watch History",
+        "analytics": "Analytics",
+        "channel-distribution": "Channel Distribution",
+        "backup": "Backup & Restore",
+        "settings": "Settings"
+    };
+    const titleText = document.getElementById("view-title-text");
+    const backBtn = document.getElementById("view-back-btn");
+    if (titleText) titleText.textContent = viewTitleMap[viewName] || viewName;
+    if (backBtn) {
+        // Always show back button per user request
+        backBtn.style.display = "flex";
+        
+        // Update opacity to indicate if there's history to walk back into
+        backBtn.style.opacity = viewHistory.length > 1 ? "1" : "0.5";
+        
+        backBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Pop the current view off the stack
+            if (viewHistory.length > 1) {
+                viewHistory.pop(); // remove current
+                const prev = viewHistory[viewHistory.length - 1];
+                _switchViewInternal(prev);
+            } else {
+                // If on root, ensure we stay on history or perform a subtle UI feedback
+                // Providing a consistent "Back" experience as requested
+                _switchViewInternal("history");
+            }
+        };
+    }
+
+    // Update Button Active States
+    ["nav-history", "nav-analytics", "nav-backup", "nav-settings"].forEach((id) => {
+      const navBtn = document.getElementById(id);
+      if (navBtn) navBtn.classList.toggle("active", id === `nav-${viewName}`);
+    });
+
+    if (typeof renderStats === 'function') renderStats();
+}
+
 function bindSidebarEvents(sidebar, btn, dragStatus) {
   // Date Navigator & Calendar Logic
   let calendarDate = new Date(); // Month/Year currently shown in the calendar popover
 
-  const updateDateLabel = () => {
-    const label = document.querySelector(".current-date-label");
-    if (!label) return;
-
-    if (selectedDayFilter === "today") {
-      label.textContent = "Today";
-    } else if (selectedDayFilter === "yesterday") {
-      label.textContent = "Yesterday";
-    } else if (selectedDayFilter.endsWith("days")) {
-      const days = parseInt(selectedDayFilter, 10);
-      label.textContent = `Last ${days} Days`;
-    } else if (selectedDayFilter === "all") {
-      label.textContent = "All History";
-    } else {
-      // YYYY-MM-DD format
-      const [y, m, d] = selectedDayFilter.split("-").map(Number);
-      const date = new Date(y, m - 1, d);
-      label.textContent = date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: y !== new Date().getFullYear() ? "numeric" : undefined,
-      });
-    }
-    
-    // Update history dropdown label
-    const historyDropdown = document.getElementById("history-period-dropdown");
-    if (historyDropdown) {
-        historyDropdown.dataset.value = selectedDayFilter;
-        const activeItem = historyDropdown.querySelector(`.dropdown-item[data-value="${selectedDayFilter}"]`);
-        if (activeItem) {
-            historyDropdown.querySelector('.dropdown-trigger span').textContent = activeItem.textContent;
-            historyDropdown.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
-            activeItem.classList.add('active');
-        } else if (!selectedDayFilter.includes('-')) {
-             // If it's a preset but we don't have an item (e.g. customized), default label
-             historyDropdown.querySelector('.dropdown-trigger span').textContent = label.textContent;
-        } else {
-             // It's a specific date from calendar
-             historyDropdown.querySelector('.dropdown-trigger span').textContent = "Custom Date";
-             historyDropdown.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
-        }
-    }
-  };
+  // Handled by top-level updateDateLabel()
 
   const renderCalendar = () => {
     const container = document.getElementById("calendar-popover");
@@ -200,75 +398,11 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     });
   }
 
-  // Function to sync history presets with data retention settings
-  const syncHistoryPresets = () => {
-    const dropdown = document.getElementById("history-period-dropdown");
-    if (!dropdown) return;
-    
-    const duration = retentionSettings.duration;
-    const items = dropdown.querySelectorAll(".dropdown-item");
-    
-    items.forEach(item => {
-        const val = item.dataset.value;
-        if (val === 'today' || val === 'yesterday' || val === 'all') {
-            item.style.display = 'block';
-            return;
-        }
-        
-        const days = parseInt(val, 10);
-        if (duration === -1 || days <= duration) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-
-    // Update Special chip label
-    const specialItem = dropdown.querySelector('.dropdown-item.special');
-    if (specialItem) {
-        specialItem.textContent = duration === -1 ? "Unlimited History" : (duration + " Days History");
-    }
-  };
-
-  // Initial sync
+  // Initial syncs
   syncHistoryPresets();
-
-  // Initial label update
   updateDateLabel();
 
   // View Navigation Logic
-  const switchView = (viewName) => {
-    activeView = viewName;
-    const hView = document.getElementById("history-view");
-    const aView = document.getElementById("analytics-view");
-    const sView = document.getElementById("settings-view");
-    const hFilters = document.getElementById("stats-header-filters");
-
-    if (hView) hView.style.display = viewName === "history" ? "block" : "none";
-    if (aView)
-      aView.style.display = viewName === "analytics" ? "block" : "none";
-    if (sView) sView.style.display = viewName === "settings" ? "block" : "none";
-    if (hFilters)
-      hFilters.style.display = (viewName === "history" || viewName === "analytics") ? "block" : "none";
-    
-    const toggleStrip = document.getElementById("history-filter-toggle");
-    if (toggleStrip)
-      toggleStrip.style.display = (viewName === "history" || viewName === "analytics") ? "flex" : "none";
-
-    const bView = document.getElementById("backup-view");
-    if (bView) bView.style.display = viewName === "backup" ? "block" : "none";
-
-    const cPopover = document.getElementById("calendar-popover");
-    if (cPopover) cPopover.style.display = "none";
-
-    // Update Button Active States
-    ["nav-history", "nav-analytics", "nav-backup", "nav-settings"].forEach((id) => {
-      const navBtn = document.getElementById(id);
-      if (navBtn) navBtn.classList.toggle("active", id === `nav-${viewName}`);
-    });
-
-    renderStats();
-  };
 
   const attachNav = (id, view) => {
     const el = document.getElementById(id);
@@ -297,6 +431,17 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     backToSettings.onclick = (e) => {
       e.stopPropagation();
       switchView("settings");
+    };
+  }
+
+
+
+
+  const navToChannels = document.getElementById("nav-to-channels");
+  if (navToChannels) {
+    navToChannels.onclick = (e) => {
+      e.stopPropagation();
+      switchView("channel-distribution");
     };
   }
 
@@ -591,10 +736,33 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
                 fileInput.value = ""; // Reset input
 
                 if (response && response.success) {
-                   // Refresh everything
-                   switchView("history");
-                   renderStats();
-                   renderBackups();
+                   // Refresh everything instantly without reload
+                   // Explicitly update local state variables from response to avoid race conditions
+                   if (response.settings) {
+                       const s = response.settings;
+                       if (s.ytt_shorts_settings) shortsBlockerSettings.enabled = s.ytt_shorts_settings.enabled;
+                       if (s.ytt_dislike_settings) dislikeCountSettings.enabled = s.ytt_dislike_settings.enabled;
+                       if (s.ytt_break_settings) {
+                           breakSettings.enabled = s.ytt_break_settings.enabled;
+                           breakSettings.intervalMinutes = s.ytt_break_settings.intervalMinutes;
+                           breakSettings.workUrl = s.ytt_break_settings.workUrl;
+                       }
+                       if (s.ytt_backup_settings) backupSettings = { ...backupSettings, ...s.ytt_backup_settings };
+                       if (s.ytt_retention_settings) retentionSettings = { ...retentionSettings, ...s.ytt_retention_settings };
+                       
+                       // Apply live side-effects
+                       if (typeof applyShortsBlockerState === 'function') applyShortsBlockerState();
+                       if (typeof applyDislikeCountState === 'function') applyDislikeCountState(dislikeCountSettings.enabled);
+                   }
+
+                   // Give storage.onChanged and DOM a moment to settle for total reliability
+                   setTimeout(() => {
+                        selectedDayFilter = 'today'; // Reset filter specifically for imports
+                        syncSettingsUI();
+                        switchView("history");
+                        renderStats();
+                        renderBackups();
+                   }, 50);
                    
                    // Show success feedback
                    const originalHtml = importBtn.innerHTML;
@@ -890,10 +1058,33 @@ function renderBackups() {
           onConfirm: () => {
              safeSendMessage({ action: "RESTORE_BACKUP", id: id }, (response) => {
                  if (response && response.success) {
-                    // Success feedback
-                    switchView("history");
-                    renderStats();
-                    renderBackups();
+                    // Success feedback: sync UI instantly
+                    // Explicitly update local state variables from response to avoid race conditions
+                    if (response.settings) {
+                        const s = response.settings;
+                        if (s.ytt_shorts_settings) shortsBlockerSettings.enabled = s.ytt_shorts_settings.enabled;
+                        if (s.ytt_dislike_settings) dislikeCountSettings.enabled = s.ytt_dislike_settings.enabled;
+                        if (s.ytt_break_settings) {
+                            breakSettings.enabled = s.ytt_break_settings.enabled;
+                            breakSettings.intervalMinutes = s.ytt_break_settings.intervalMinutes;
+                            breakSettings.workUrl = s.ytt_break_settings.workUrl;
+                        }
+                        if (s.ytt_backup_settings) backupSettings = { ...backupSettings, ...s.ytt_backup_settings };
+                        if (s.ytt_retention_settings) retentionSettings = { ...retentionSettings, ...s.ytt_retention_settings };
+
+                        // Apply live side-effects
+                        if (typeof applyShortsBlockerState === 'function') applyShortsBlockerState();
+                        if (typeof applyDislikeCountState === 'function') applyDislikeCountState(dislikeCountSettings.enabled);
+                    }
+
+                    // Give storage.onChanged and DOM a moment to settle for total reliability
+                    setTimeout(() => {
+                        selectedDayFilter = 'today'; // Reset filter specifically for restores
+                        syncSettingsUI();
+                        switchView("history");
+                        renderStats();
+                        renderBackups();
+                    }, 50);
                  } else {
                     alert("Failed to restore: " + (response ? response.error : "Unknown error"));
                  }

@@ -69,8 +69,40 @@ for (const file of JS_FILES) {
     output += '\n\n';
 }
 
+// --- (Previous logic for JS continues) ---
+
 fs.writeFileSync(OUTPUT_FILE, output, 'utf-8');
 console.log(`✅ Build complete: dist/content.js (${(fs.statSync(OUTPUT_FILE).size / 1024).toFixed(1)} KB)`);
+
+// ─── CSS Bundle ───
+const CSS_OUTPUT = path.join(DIST_DIR, 'content.css');
+const CSS_FILES = [
+    'src/shared/theme.css',
+    'src/shared/modal.css',
+    'src/stats-tracker/toggle-button.css',
+    'src/stats-tracker/sidebar.css',
+    'src/stats-tracker/dashboard.css',
+    'src/stats-tracker/charts.css',
+    'src/settings/settings.css',
+    'src/break-reminder/break-modal.css',
+    'src/init/responsive.css'
+];
+
+let cssOutput = `/* Unified Styles Bundle — Built at: ${new Date().toISOString()} */\n\n`;
+for (const file of CSS_FILES) {
+    const filePath = path.join(__dirname, file);
+    if (!fs.existsSync(filePath)) {
+        console.error(`ERROR: Missing CSS source file: ${filePath}`);
+        continue;
+    }
+    const content = fs.readFileSync(filePath, 'utf-8');
+    cssOutput += `/* ─── ${file} ─── */\n`;
+    cssOutput += content;
+    cssOutput += '\n\n';
+}
+
+fs.writeFileSync(CSS_OUTPUT, cssOutput, 'utf-8');
+console.log(`✅ Build complete: dist/content.css (${(fs.statSync(CSS_OUTPUT).size / 1024).toFixed(1)} KB)`);
 
 // ─── Background Bundle ───
 const BACKGROUND_OUTPUT = path.join(DIST_DIR, 'background.js');

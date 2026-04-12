@@ -45,7 +45,7 @@
     font-size: 14px !important;
     font-weight: 600 !important;
     color: var(--stats-text-primary) !important;
-    margin-bottom: 16px !important;
+    margin-bottom: 16px;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
 }

@@ -68,6 +68,14 @@ function updateStats(explicitVideoId, isFinalSync) {
         ? channelNameEl.textContent.trim()
         : "Loading Channel...";
 
+      const channelAvatarEl = 
+        document.querySelector("ytd-video-owner-renderer #avatar yt-img-shadow img") ||
+        document.querySelector("ytd-watch-metadata #owner #avatar img") ||
+        document.querySelector("#owner #avatar img") ||
+        document.querySelector("ytd-video-owner-renderer img") ||
+        document.querySelector("#upload-info img#img");
+      const channelThumb = channelAvatarEl ? (channelAvatarEl.currentSrc || channelAvatarEl.src) : null;
+
       if (!todayData.videos.find((v) => v.uid === currentUid)) {
         todayData.videos.push({
           uid: currentUid,
@@ -75,6 +83,7 @@ function updateStats(explicitVideoId, isFinalSync) {
           title: title,
           channelName: channelName,
           thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+          channelThumb: channelThumb,
           startTime: new Date().toLocaleTimeString(),
           watchedDuration: 0,
           currentPosition: 0,
@@ -119,6 +128,20 @@ function updateStats(explicitVideoId, isFinalSync) {
           document.querySelector("ytd-video-owner-renderer #channel-name a");
         if (channelNameEl)
           activeVideo.channelName = channelNameEl.textContent.trim();
+      }
+      if (!activeVideo.channelThumb || activeVideo.channelThumb.startsWith('data:')) {
+        const channelAvatarEl = 
+          document.querySelector("ytd-video-owner-renderer #avatar yt-img-shadow img") ||
+          document.querySelector("ytd-watch-metadata #owner #avatar img") ||
+          document.querySelector("#owner #avatar img") ||
+          document.querySelector("ytd-video-owner-renderer img") ||
+          document.querySelector("#upload-info img#img");
+        if (channelAvatarEl) {
+          const src = channelAvatarEl.currentSrc || channelAvatarEl.src;
+          if (src && !src.startsWith('data:')) {
+            activeVideo.channelThumb = src;
+          }
+        }
       }
 
       // GUARD: When isNewVideo is true, skip reading from the <video> element.

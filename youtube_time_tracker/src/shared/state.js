@@ -308,12 +308,14 @@ storage.onChanged.addListener((changes, area) => {
         };
         shortsBlockerSettings.enabled = newValue.enabled;
         applyShortsBlockerState(); // Live apply shorts blocker toggle
+        needsUIRefresh = true;
       }
       if (changes.ytt_dislike_settings) {
         const newValue = changes.ytt_dislike_settings.newValue;
         if (newValue && typeof newValue === "object") {
           dislikeCountSettings.enabled = newValue.enabled ?? true;
           applyDislikeCountState(dislikeCountSettings.enabled);
+          needsUIRefresh = true;
         }
       }
       if (changes.ytt_break_settings) {
@@ -325,6 +327,7 @@ storage.onChanged.addListener((changes, area) => {
         breakSettings.enabled = newValue.enabled;
         breakSettings.intervalMinutes = newValue.intervalMinutes;
         breakSettings.workUrl = newValue.workUrl;
+        needsUIRefresh = true;
       }
       if (changes.ytt_backup_settings) {
         backupSettings = {
@@ -336,16 +339,19 @@ storage.onChanged.addListener((changes, area) => {
           },
           ...(changes.ytt_backup_settings.newValue || {}),
         };
+        needsUIRefresh = true;
       }
       if (changes.ytt_retention_settings) {
         retentionSettings = {
           ...{ duration: 7 },
           ...(changes.ytt_retention_settings.newValue || {}),
         };
+        needsUIRefresh = true;
       }
 
       // Only re-render if the stats panel is actually open
       if (needsUIRefresh && isStatsOpen) {
+        if (typeof syncSettingsUI === "function") syncSettingsUI();
         renderStats();
       }
     }

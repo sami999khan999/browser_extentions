@@ -163,8 +163,8 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse(backup);
     } else if (request.action === "IMPORT_BACKUP") {
       handleImportBackup(request.clientData)
-        .then((success) => {
-          sendResponse({ success });
+        .then((result) => {
+          sendResponse({ success: result.success, settings: result.settings });
         })
         .catch((err) => {
           sendResponse({ success: false, error: err.message });
@@ -178,8 +178,8 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           throw new Error("Backup not found");
         })
-        .then((success) => {
-          sendResponse({ success });
+        .then((result) => {
+          sendResponse({ success: result.success, settings: result.settings });
         })
         .catch((err) => {
           sendResponse({ success: false, error: err.message });
@@ -284,6 +284,17 @@ function handleWatchTimeReport(data) {
       // 2. Aggregate Watch Time: always increment (5 tabs = 5s per second)
       todayData.watchTime += delta;
     }
+    
+    // Track if this specific video instance is currently playing
+    const wasPlaying = !!videoEntry.isPlaying;
+    videoEntry.isPlaying = !!data.isPlaying;
+
+    // Update lastStarted only when transitions to playing or is new and playing
+    // This prevents the "shuffling" jitter in the history list across tabs.
+    if (videoEntry.isPlaying && (!wasPlaying || !videoEntry.lastStarted)) {
+      videoEntry.lastStarted = Date.now();
+    }
+
     if (currentPosition !== undefined && isFinite(currentPosition))
       videoEntry.currentPosition = currentPosition;
     if (
@@ -298,8 +309,19 @@ function handleWatchTimeReport(data) {
       videoEntry.channelName = channelName;
   }
 
-  // Track active usage time (heartbeat)
+  // --- Multi-Tab Stale Cleanup ---
+  // Ensure videos that haven't reported in 3s are marked as NOT playing.
+  // This handles closed tabs or videos that were paused without a final report.
   const now = Date.now();
+  if (todayData && todayData.videos) {
+    todayData.videos.forEach(v => {
+        if (v.isPlaying && (now - (v.lastUpdated || 0) > 3000)) {
+            v.isPlaying = false;
+        }
+    });
+  }
+
+  // Track active usage time (heartbeat)
   const timeSinceLastActiveUpdate = now - lastGlobalActiveUpdateTime;
 
   // STRICT LINEAR TIME: Only add time if 1s+ has passed globally.
@@ -458,14 +480,22 @@ async function handleImportBackup(data) {
   if (!data) throw new Error("No data provided for import");
 
   try {
-    // Update memory state
-    if (data.allHistory) allHistory = data.allHistory;
-    if (data.shortsBlockerSettings)
-      shortsBlockerSettings = data.shortsBlockerSettings;
-    if (data.breakSettings) breakSettings = data.breakSettings;
-    if (data.backupSettings) backupSettings = data.backupSettings;
-    if (data.retentionSettings) retentionSettings = data.retentionSettings;
-    if (data.dislikeCountSettings) dislikeCountSettings = data.dislikeCountSettings;
+    // Update memory state - Ensure every setting is updated or reset to default
+    allHistory = data.allHistory || data.ytt_history || {};
+    shortsBlockerSettings = data.shortsBlockerSettings || data.ytt_shorts_settings || { enabled: true };
+    breakSettings = data.breakSettings || data.ytt_break_settings || {
+      enabled: true,
+      intervalMinutes: 15,
+      workUrl: "https://www.google.com",
+    };
+    backupSettings = data.backupSettings || data.ytt_backup_settings || {
+      enabled: true,
+      intervalHours: 24,
+      backupOnClose: true,
+      maxBackups: 10,
+    };
+    retentionSettings = data.retentionSettings || data.ytt_retention_settings || { duration: 7 };
+    dislikeCountSettings = data.dislikeCountSettings || data.ytt_dislike_settings || { enabled: true };
 
     // Save to storage
     const saveObj = {
@@ -490,10 +520,19 @@ async function handleImportBackup(data) {
     // Create an automatic backup of the newly imported state for safety
     await createBackup();
 
-    return true;
-  } catch (e) {
-    console.error("Background: Import failed:", e);
-    throw e;
+    return { 
+      success: true, 
+      settings: {
+        ytt_shorts_settings: shortsBlockerSettings,
+        ytt_break_settings: breakSettings,
+        ytt_backup_settings: backupSettings,
+        ytt_retention_settings: retentionSettings,
+        ytt_dislike_settings: dislikeCountSettings
+      }
+    };
+  } catch (err) {
+    console.error("YTT: Import backup failed:", err);
+    throw err;
   }
 }
 

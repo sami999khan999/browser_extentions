@@ -94,38 +94,44 @@ function renderStats() {
                 fullSortedVideos = [];
                 loadedVideoCount = 0;
             } else {
-                // Sort by lastUpdated descending (most recently active at the top)
-                fullSortedVideos = displayVideos.slice().sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+                // Sort by lastStarted descending (fallback to lastUpdated for existing data)
+                fullSortedVideos = displayVideos.slice().sort((a, b) => {
+                    const aTime = a.lastStarted || a.lastUpdated || 0;
+                    const bTime = b.lastStarted || b.lastUpdated || 0;
+                    return bTime - aTime;
+                });
                 listEl.innerHTML = '';
                 loadedVideoCount = 0;
                 appendHistoryBatch();
             }
         } else if (listEl && activeView === 'history') {
-            // Incremental update for ALL videos (multi-tab sync)
+            // High-frequency UI sync for ALL videos across multiple tabs
+            let topVideoUid = null;
+            
+            // 1. Determine which video SHOULD be at the top
+            // Rule: Local video wins if playing, otherwise most recent global starter.
+            const localVideo = displayVideos.find(v => v.uid === currentUid);
+            if (localVideo && localVideo.isPlaying) {
+                topVideoUid = localVideo.uid;
+            } else {
+                // Find most recently started video across all tabs
+                const latestGlobal = [...displayVideos].sort((a, b) => {
+                    const aTime = a.lastStarted || a.lastUpdated || 0;
+                    const bTime = b.lastStarted || b.lastUpdated || 0;
+                    return bTime - aTime;
+                })[0];
+                if (latestGlobal) topVideoUid = latestGlobal.uid;
+            }
+
             displayVideos.forEach(videoData => {
                 const item = listEl.querySelector(`.history-item[data-uid="${videoData.uid}"]`);
                 if (item) {
                     const isActive = videoData.uid === currentUid;
                     item.classList.toggle('active-tab-video', isActive);
                     
-                    // Re-order logic: Prioritize the video playing in the CURRENT tab.
-                    if (item.previousElementSibling) {
-                        const firstChild = listEl.firstElementChild;
-                        const firstUid = firstChild ? firstChild.dataset.uid : null;
-
-                        if (isActive) {
-                            // If this is the current tab's video, it MUST be at the top.
-                            listEl.prepend(item);
-                        } else if (firstUid !== currentUid) {
-                            // Only allow other active videos to move if the current top is NOT 
-                            // the local active video. This ensures the current tab's video stays on top.
-                            const isRecentlyActive = videoData.lastUpdated && (Date.now() - videoData.lastUpdated < 5000);
-                            const firstVideo = displayVideos.find(v => v.uid === firstUid);
-                            
-                            if (isRecentlyActive && (!firstVideo || videoData.lastUpdated > (firstVideo.lastUpdated || 0))) {
-                                listEl.prepend(item);
-                            }
-                        }
+                    // Re-order logic: Move the designated top video to the first position
+                    if (videoData.uid === topVideoUid && item.previousElementSibling) {
+                        listEl.prepend(item);
                     }
 
                     const timeEl = item.querySelector('.time-readout');
@@ -164,6 +170,12 @@ function renderStats() {
                     }
                 }
             });
+        }
+    } else if (activeView === 'channel-distribution') {
+        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
+            lastRenderedView = activeView;
+            lastRenderedFilter = selectedDayFilter;
+            renderChannelDistribution(getFilteredAnalyticsData());
         }
     } else {
         if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {

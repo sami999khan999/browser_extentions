@@ -4,7 +4,12 @@ function getSidebarHTML() {
   return `
         <div class="stats-header">
             <div class="header-top">
-                <h2>Stats Tracker</h2>
+                <div class="header-view-title">
+                    <button id="view-back-btn" class="icon-back-btn" title="Go Back">
+                        ${icons.prev}
+                    </button>
+                    <h2 id="view-title-text">Stats Tracker</h2>
+                </div>
                 <div class="header-actions">
                     <button id="nav-history" title="Watch History" class="active">${icons.history}</button>
                     <button id="nav-analytics" title="Analytics Trends">${icons.analytics}</button>
@@ -14,6 +19,7 @@ function getSidebarHTML() {
                 </div>
             </div>
         </div>
+
         <div id="stats-header-filters" class="stats-subheader collapsed" style="display: none;">
             <div class="filter-toolbar">
                 <div class="date-nav-group">
@@ -72,7 +78,10 @@ function getSidebarHTML() {
                     </div>
                 </div>
                 <div class="video-list-container">
-                    <h3 id="history-title">Watch History (Today)</h3>
+                    <div class="history-header-row">
+                        <h3 id="history-title">Watch History (Today)</h3>
+                        <button id="nav-to-channels" class="header-pill-btn">Channels</button>
+                    </div>
                     <ul id="video-history-list"></ul>
                     <div id="history-loading" class="infinite-scroll-loader" style="display: none;">
                         <div class="loading-spinner"></div>
@@ -120,15 +129,15 @@ function getSidebarHTML() {
                             <h3>Watch Distribution</h3>
                         </div>
                     </div>
-                    <div class="pie-layout-modern">
-                        <div class="pie-chart-wrapper">
+                    <div class="pie-layout-modern-v">
+                        <div class="pie-chart-wrapper-large">
                             <div id="pie-chart"></div>
                             <div class="pie-center-info">
                                 <span id="pie-total-label">Total</span>
                                 <span id="pie-total-value">0h</span>
                             </div>
                         </div>
-                        <div id="pie-legend" class="modern-legend"></div>
+                        <div id="pie-legend" class="modern-legend-pills"></div>
                     </div>
                 </div>
 
@@ -136,8 +145,9 @@ function getSidebarHTML() {
                     <div class="section-header">
                         <div class="header-main">
                             <span class="section-icon">${icons.calendar}</span>
-                            <h3>Activity Heatmap</h3>
+                            <h3>Heatmap</h3>
                         </div>
+                        <div id="heatmap-year-selector" class="heatmap-year-selector"></div>
                         <div class="heatmap-legend">
                             <span>Less</span>
                             <div class="legend-cells">
@@ -171,6 +181,12 @@ function getSidebarHTML() {
                         </div>
                     </div>
                     <div id="key-insights" class="insights-grid"></div>
+                </div>
+            </div>
+
+            <div id="channel-distribution-view" style="display: none;">
+                <div id="full-channel-list" class="detailed-channel-list">
+                    <div class="loading-placeholder">Loading distribution...</div>
                 </div>
             </div>
 
@@ -304,7 +320,8 @@ function getSidebarHTML() {
                                         12: "Every 12 Hours",
                                         24: "Every Day",
                                         168: "Every Week",
-                                      }[backupSettings.intervalHours] || "Every Day"
+                                      }[backupSettings.intervalHours] ||
+                                      "Every Day"
                                     }</span>
                                     <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </div>

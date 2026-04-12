@@ -1,5 +1,7 @@
 // === Analytics Rendering: Bar chart, pie chart, heatmaps, insights ===
 
+let selectedHeatmapYear = 'Last 365 Days';
+
 function renderAnalyticsView() {
     const data = getFilteredAnalyticsData();
     
@@ -82,7 +84,39 @@ function getFilteredAnalyticsData() {
         // Aggregate Channels
         (dayData.videos || []).forEach(v => {
             const chan = v.channelName || 'Unknown Channel';
-            channelsMap[chan] = (channelsMap[chan] || 0) + (v.watchedDuration || 0);
+            const duration = (v.watchedDuration || 0);
+            
+            if (!channelsMap[chan]) {
+                channelsMap[chan] = { 
+                    value: 0, 
+                    thumbnail: v.thumbnail, 
+                    videos: new Map(), // Use Map to track duration per unique video
+                    topVideo: { title: v.title, duration: duration }
+                };
+            }
+            
+            channelsMap[chan].value += duration;
+            
+            // Track duration for this specific video ID to find top video
+            const vidId = v.id || v.uid;
+            const existingVidData = channelsMap[chan].videos.get(vidId) || { duration: 0, title: v.title };
+            existingVidData.duration += duration;
+            channelsMap[chan].videos.set(vidId, existingVidData);
+            
+            // Update Top Video if this overall duration is higher
+            if (existingVidData.duration > channelsMap[chan].topVideo.duration) {
+                channelsMap[chan].topVideo = { title: existingVidData.title, duration: existingVidData.duration };
+            }
+            
+            // Prioritize Captured Channel Logo > Captured Video Thumbnail > Generated Fallback
+            const thumbFallback = `https://i.ytimg.com/vi/${vidId}/default.jpg`;
+            const logo = v.channelThumb || v.thumbnail || thumbFallback;
+            
+            // Only update if we don't have a logo yet, or if we have a real channelThumb now
+            const isRealLogo = v.channelThumb && !v.channelThumb.startsWith('data:');
+            if (!channelsMap[chan].thumbnail || isRealLogo) {
+                channelsMap[chan].thumbnail = logo;
+            }
         });
 
         result.totalWatchTime += val;
@@ -97,7 +131,14 @@ function getFilteredAnalyticsData() {
     
     // Sort and finalize channels
     result.channels = Object.entries(channelsMap)
-        .map(([label, value]) => ({ label, value }))
+        .map(([label, info]) => ({ 
+            label, 
+            value: info.value,
+            videoCount: info.videos.size,
+            thumbnail: info.thumbnail,
+            topVideo: info.topVideo.title,
+            avgTime: info.value / info.videos.size
+        }))
         .sort((a, b) => b.value - a.value);
     
     return result;
@@ -271,36 +312,83 @@ function renderWatchDistribution(data) {
         return;
     }
 
-    // Top 5 channels or aggregate others
+    // Calculate slices for ALL channels (per user request)
     const sorted = [...data.channels];
-    const topN = sorted.slice(0, 5).map((c, i) => ({
-        ...c,
-        color: dayColors[i % dayColors.length]
-    }));
-    
-    const othersValue = sorted.slice(5).reduce((acc, c) => acc + c.value, 0);
-    
-    if (othersValue > 0) {
-        topN.push({ label: 'Others', value: othersValue, color: '#666' });
-    }
-
     let cumulativePercent = 0;
-    const slices = topN.map(d => {
+    const slices = sorted.map((c, i) => {
         const start = cumulativePercent;
-        const end = start + (d.value / data.totalWatchTime) * 100;
+        const end = start + (c.value / data.totalWatchTime) * 100;
         cumulativePercent = end;
-        return { ...d, start, end };
+        return { 
+            ...c, 
+            start, 
+            end,
+            color: dayColors[i % dayColors.length]
+        };
     });
+
+    const updatePieHighlight = (hoverIdx) => {
+        const gradient = slices.map((s, i) => {
+            let color = s.color;
+            if (hoverIdx !== -1 && i !== hoverIdx) {
+                // Dim other slices using a simple rgba opacity if they were hex
+                // Since they are strings, we'll convert them or just use a dimmed overlay logic.
+                // For simplicity, we'll use a helper to dim the hex colors.
+                color = hexToRgba(color, 0.2);
+            }
+            return `${color} ${s.start}% ${s.end}%`;
+        }).join(', ');
+        pieChart.style.background = `conic-gradient(${gradient})`;
+    };
+
+    // Helper to dim hex colors
+    function hexToRgba(hex, alpha) {
+        let r, g, b;
+        if (hex.length === 4) {
+            r = parseInt(hex[1] + hex[1], 16);
+            g = parseInt(hex[2] + hex[2], 16);
+            b = parseInt(hex[3] + hex[3], 16);
+        } else {
+            r = parseInt(hex.slice(1, 3), 16);
+            g = parseInt(hex.slice(3, 5), 16);
+            b = parseInt(hex.slice(5, 7), 16);
+        }
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
 
     pieChart.style.background = `conic-gradient(${slices.map(s => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`;
     
-    pieLegend.innerHTML = slices.map(d => `
-        <div class="legend-item">
+    // Render Top 5 as pills + View All button
+    pieLegend.innerHTML = slices.slice(0, 5).map(d => `
+        <div class="legend-item" data-channel="${d.label || d.key}">
             <span class="legend-color" style="background: ${d.color}"></span>
             <span class="legend-label">${d.label || d.key}</span>
             <span class="legend-value">${Math.round((d.value/data.totalWatchTime)*100)}%</span>
         </div>
-    `).join('');
+    `).join('') + `
+        <button id="view-all-channels" class="view-more-btn">
+            View All Channels
+        </button>
+    `;
+
+    // Setup "View All Channels" view switching
+    const viewAllBtn = document.getElementById('view-all-channels');
+    if (viewAllBtn) {
+        viewAllBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
+            activeView = 'channel-distribution';
+            localStorage.setItem('ytt_active_view', activeView);
+            switchView(activeView);
+            renderChannelDistribution(data);
+        };
+    }
+
+
+    // Interaction for legend items
+    pieLegend.querySelectorAll('.legend-item').forEach((item, idx) => {
+        item.onmouseenter = () => updatePieHighlight(idx);
+        item.onmouseleave = () => updatePieHighlight(-1);
+    });
 
     // Interaction
     const tooltip = document.getElementById('stats-tooltip');
@@ -314,52 +402,240 @@ function renderWatchDistribution(data) {
         
         const activeSlice = slices.find(s => percent >= s.start && percent < s.end);
         if (activeSlice) {
-            tooltip.innerHTML = `<b>${activeSlice.label || activeSlice.key}</b><br>${formatTime(Math.round(activeSlice.value))} (${Math.round((activeSlice.value/data.totalWatchTime)*100)}%)`;
+            const pct = Math.round((activeSlice.value / data.totalWatchTime) * 100);
+            const avgStr = formatTimeShort(activeSlice.avgTime || (activeSlice.value / activeSlice.videoCount));
+            tooltip.innerHTML = `
+                <div class="tooltip-date">${activeSlice.label || activeSlice.key}</div>
+                <div class="tooltip-stat-row">
+                    <span class="tooltip-stat-label">Watch Time</span>
+                    <span class="tooltip-stat-value">${formatTime(Math.round(activeSlice.value))}</span>
+                </div>
+                <div class="tooltip-stat-row">
+                    <span class="tooltip-stat-label">Share</span>
+                    <span class="tooltip-stat-value">${pct}%</span>
+                </div>
+                <div class="tooltip-stat-row">
+                    <span class="tooltip-stat-label">Videos</span>
+                    <span class="tooltip-stat-value">${activeSlice.videoCount}</span>
+                </div>
+                <div class="tooltip-stat-row">
+                    <span class="tooltip-stat-label">Avg / Video</span>
+                    <span class="tooltip-stat-value">${avgStr}</span>
+                </div>
+                ${activeSlice.topVideo ? `
+                    <div class="tooltip-videos-header">Most Watched</div>
+                    <div class="tooltip-video-item">${activeSlice.topVideo}</div>
+                ` : ''}
+            `;
             tooltip.classList.add('visible');
             positionTooltip(e, tooltip);
+            // Highlight the hovered slice
+            const sliceIdx = slices.indexOf(activeSlice);
+            updatePieHighlight(sliceIdx);
         } else {
             tooltip.classList.remove('visible');
+            updatePieHighlight(-1);
         }
     };
-    pieChart.onmouseleave = () => tooltip.classList.remove('visible');
+    pieChart.onmouseleave = () => {
+        tooltip.classList.remove('visible');
+        updatePieHighlight(-1);
+    };
+}
+
+function renderChannelDistribution(data) {
+    const listEl = document.getElementById('full-channel-list');
+    if (!listEl) return;
+
+    if (!data || !data.channels || data.channels.length === 0) {
+        listEl.innerHTML = '<div class="loading-placeholder">No channel data available</div>';
+        return;
+    }
+
+    // Sort all channels by value descending
+    const sorted = [...data.channels].sort((a, b) => b.value - a.value);
+    
+    listEl.innerHTML = sorted.map((c, index) => {
+        const percent = Math.round((c.value / data.totalWatchTime) * 100);
+        const rank = index + 1;
+        const avgStr = formatTimeShort(c.avgTime || (c.value / c.videoCount));
+        
+        return `
+            <div class="channel-card-detailed">
+                <div class="channel-rank-badge ${rank <= 3 ? 'top-rank' : ''}">${rank}</div>
+                <div class="channel-info-detailed">
+                    <div class="channel-main-row">
+                        <span class="channel-name" title="${c.label || c.key}">${c.label || c.key}</span>
+                        <div class="channel-percent-detailed">${percent}%</div>
+                    </div>
+                    <div class="channel-stats-row">
+                        <span>${formatTime(Math.round(c.value))} total • ${c.videoCount} video${c.videoCount !== 1 ? 's' : ''} • Avg ${avgStr}/vid</span>
+                    </div>
+                    <div class="channel-top-video-row">
+                        <span class="top-video-title" title="${c.topVideo}">🏆 ${c.topVideo}</span>
+                    </div>
+                    <div class="channel-progress-container">
+                        <div class="channel-progress-fill" style="width: ${percent}%"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 function renderActivityHeatmap() {
     const container = document.getElementById('activity-heatmap');
+    const selectorContainer = document.getElementById('heatmap-year-selector');
     if (!container) return;
 
-    const weeks = 30; // Slightly wider to fill sidebar space
-    const daysInHeatmap = weeks * 7;
-    const now = new Date();
+    // 1. Year Discovery & Selector Rendering
+    const years = Array.from(new Set(Object.keys(allHistory).map(k => k.split('-')[0]))).sort((a, b) => b - a);
+    const options = ['Last 365 Days', ...years];
     
-    let html = '<div class="heatmap-grid">';
-    let heatmapData = [];
-
-    for (let i = daysInHeatmap - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        const key = getDayKey(d);
-        const val = allHistory[key] ? allHistory[key].watchTime : 0;
+    if (selectorContainer) {
+        selectorContainer.innerHTML = `
+            <div class="custom-dropdown heatmap-year-dropdown" id="heatmap-year-dropdown">
+                <div class="dropdown-trigger">
+                    <span>${selectedHeatmapYear}</span>
+                    <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="dropdown-menu">
+                    ${options.map(y => `
+                        <div class="dropdown-item ${selectedHeatmapYear == y ? 'active' : ''}" data-value="${y}">
+                            ${y}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
         
-        let level = 0;
-        if (val > 0) level = 1;
-        if (val > 3600) level = 2; // 1hr
-        if (val > 7200) level = 3; // 2hr
-        if (val > 14400) level = 4; // 4hr+
+        const dropdown = document.getElementById('heatmap-year-dropdown');
+        if (dropdown) {
+            const trigger = dropdown.querySelector('.dropdown-trigger');
+            trigger.onclick = (e) => {
+                e.stopPropagation();
+                // Close other open dropdowns first
+                document.querySelectorAll('.custom-dropdown.open').forEach(d => {
+                    if (d !== dropdown) d.classList.remove('open');
+                });
+                dropdown.classList.toggle('open');
+            };
 
-        heatmapData.push({ key, val, level });
+            dropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedHeatmapYear = item.dataset.value;
+                    dropdown.classList.remove('open');
+                    renderActivityHeatmap();
+                };
+            });
+        }
     }
 
-    html += heatmapData.map(d => `
-        <div class="heatmap-cell level-${d.level}" data-tooltip="<b>${d.key}</b><br>${formatTime(Math.round(d.val))}"></div>
-    `).join('');
-    
-    html += '</div>';
-    container.innerHTML = html;
+    // 2. Date Range Calculation
+    let startDate, endDate, weeks;
+    const now = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const days = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
+    if (selectedHeatmapYear === 'Last 365 Days') {
+        weeks = 53; // Full year sliding window
+        endDate = new Date(now);
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - (weeks * 7) + 1);
+        // Align to Sunday
+        while (startDate.getDay() !== 0) {
+            startDate.setDate(startDate.getDate() - 1);
+        }
+    } else {
+        const year = parseInt(selectedHeatmapYear);
+        startDate = new Date(year, 0, 1);
+        endDate = new Date(year, 11, 31);
+        // Align start to the first Sunday on or before Jan 1
+        while (startDate.getDay() !== 0) {
+            startDate.setDate(startDate.getDate() - 1);
+        }
+        // Calculate weeks needed to cover the whole year
+        const diffTime = Math.abs(endDate - startDate);
+        weeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+    }
+    
+    let heatmapData = [];
+    let months = [];
+    let lastMonth = -1;
+
+    for (let i = 0; i < weeks * 7; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const key = getDayKey(d);
+        const dayData = allHistory[key] || { watchTime: 0, activeTime: 0, videos: [] };
+        const val = dayData.watchTime;
+        
+        // Month label logic
+        if (i % 7 === 0) {
+            const m = d.getMonth();
+            if (m !== lastMonth) {
+                months.push({ name: monthNames[m], index: i / 7 });
+                lastMonth = m;
+            }
+        }
+
+        let level = 0;
+        if (val > 0) level = 1;
+        if (val > 3600) level = 2;
+        if (val > 7200) level = 3;
+        if (val > 14400) level = 4;
+
+        const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        const videos = [...(dayData.videos || [])]
+            .sort((a, b) => (b.watchedDuration || 0) - (a.watchedDuration || 0))
+            .slice(0, 3);
+            
+        let tooltipHtml = `
+            <div class="tooltip-date">${dateStr}</div>
+            <div class="tooltip-stat-row">
+                <span class="tooltip-stat-label">Watch Time</span>
+                <span class="tooltip-stat-value">${formatTime(Math.round(val))}</span>
+            </div>
+            <div class="tooltip-stat-row">
+                <span class="tooltip-stat-label">Videos</span>
+                <span class="tooltip-stat-value">${dayData.videos ? dayData.videos.length : 0}</span>
+            </div>
+        `;
+        
+        if (videos.length > 0) {
+            tooltipHtml += `<div class="tooltip-videos-header">Top Videos:</div>`;
+            videos.forEach(v => {
+                tooltipHtml += `<div class="tooltip-video-item">${v.title}</div>`;
+            });
+        }
+
+        heatmapData.push({ key, val, level, tooltipHtml });
+    }
+
+    let html = `
+        <div class="heatmap-modern-wrapper">
+            <div class="heatmap-months-row" style="grid-template-columns: repeat(${weeks}, 11px)">
+                ${months.map((m, i) => `
+                    <span class="month-label" style="grid-column: ${m.index + 1}">${m.name}</span>
+                `).join('')}
+            </div>
+            <div class="heatmap-main-row">
+                <div class="heatmap-days-col">
+                    ${days.map(d => `<span class="day-label">${d}</span>`).join('')}
+                </div>
+                <div class="heatmap-grid modern" style="grid-template-columns: repeat(${weeks}, 11px)">
+                    ${heatmapData.map(d => `
+                        <div class="heatmap-cell level-${d.level}" data-tooltip="${d.tooltipHtml.replace(/"/g, '&quot;')}"></div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
     bindAnalyticsTooltips(container);
 
-    // Setup scroll arrows
     initCustomScroll('activity-heatmap', 'heatmap-scroll-left', 'heatmap-scroll-right');
 }
 

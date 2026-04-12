@@ -24,7 +24,7 @@ const videosTitles = [
     "Is this the future of gaming?"
 ];
 
-function generateMockData(daysToGenerate = 190) {
+function generateMockData(daysToGenerate = 730) {
     const today = new Date();
     const allHistory = {};
 
@@ -96,8 +96,8 @@ function generateMockData(daysToGenerate = 190) {
     return JSON.stringify(fullData, null, 2);
 }
 
-const outputPath = path.join(__dirname, 'mock_history_200_days.json');
+const outputPath = path.join(__dirname, 'mock_history_2_years.json');
 console.log('Generating data...');
-const mockData = generateMockData(200);
+const mockData = generateMockData(730);
 fs.writeFileSync(outputPath, mockData);
 console.log(`✅ Success! Data created at: ${outputPath}`);
