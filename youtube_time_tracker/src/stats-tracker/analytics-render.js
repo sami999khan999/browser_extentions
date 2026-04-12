@@ -18,8 +18,88 @@ function renderAnalyticsView() {
 /**
  * Aggregates watch data based on the current global selectedDayFilter
  */
-function getFilteredAnalyticsData() {
+function getPeriodKeys(filter, offset = 0) {
     const now = new Date();
+    let keys = [];
+    
+    if (filter === 'today') {
+        const d = new Date(now);
+        d.setDate(d.getDate() - offset);
+        keys = [getDayKey(d)];
+    } else if (filter === 'yesterday') {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 1 - offset);
+        keys = [getDayKey(d)];
+    } else if (filter.endsWith('days')) {
+        const daysCount = parseInt(filter);
+        const startOffset = (offset + 1) * daysCount - 1;
+        const endOffset = offset * daysCount;
+        for (let i = startOffset; i >= endOffset; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            keys.push(getDayKey(d));
+        }
+    } else if (filter === 'all') {
+        if (offset === 0) {
+             keys = Object.keys(allHistory).sort();
+        } else {
+             keys = [];
+        }
+    } else {
+        // Specific date YYYY-MM-DD
+        const dateParts = filter.split('-').map(Number);
+        const d = new Date(dateParts[0], dateParts[1]-1, dateParts[2]);
+        d.setDate(d.getDate() - offset);
+        keys = [getDayKey(d)];
+    }
+    return keys;
+}
+
+function isFutureDate(filter) {
+    if (!filter || filter === 'today' || filter === 'yesterday' || filter.endsWith('days') || filter === 'all') return false;
+    const dateParts = filter.split('-').map(Number);
+    if (dateParts.length !== 3) return false;
+    const selectedDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate > today;
+}
+
+/**
+ * Aggregates summary statistics for a given set of date keys.
+ */
+function getPeriodSummary(keys) {
+    const stats = {
+        totalTime: 0,
+        activeDays: 0,
+        videoCount: 0,
+        topChannel: { name: 'None', time: 0 }
+    };
+    const channelMap = {};
+
+    keys.forEach(key => {
+        const d = allHistory[key];
+        if (d && d.watchTime > 0) {
+            stats.activeDays++;
+            stats.totalTime += d.watchTime;
+            stats.videoCount += (d.videos ? d.videos.length : 0);
+            (d.videos || []).forEach(v => {
+                const c = v.channelName || 'Unknown';
+                channelMap[c] = (channelMap[c] || 0) + (v.watchedDuration || 0);
+                if (channelMap[c] > stats.topChannel.time) {
+                    stats.topChannel = { name: c, time: channelMap[c] };
+                }
+            });
+        }
+    });
+
+    return stats;
+}
+
+/**
+ * Aggregates watch data based on the current global selectedDayFilter
+ */
+function getFilteredAnalyticsData() {
     const result = {
         days: [], // { key, label, value, color }
         channels: [], // { label, value }
@@ -30,28 +110,7 @@ function getFilteredAnalyticsData() {
     };
 
     const channelsMap = {};
-
-    let keysToInclude = [];
-
-    if (selectedDayFilter === 'today') {
-        keysToInclude = [getDayKey(now)];
-    } else if (selectedDayFilter === 'yesterday') {
-        const yest = new Date(now);
-        yest.setDate(yest.getDate() - 1);
-        keysToInclude = [getDayKey(yest)];
-    } else if (selectedDayFilter.endsWith('days')) {
-        const daysCount = parseInt(selectedDayFilter);
-        for (let i = daysCount - 1; i >= 0; i--) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            keysToInclude.push(getDayKey(d));
-        }
-    } else if (selectedDayFilter === 'all') {
-        keysToInclude = Object.keys(allHistory).sort();
-    } else {
-        // Specific date YYYY-MM-DD
-        keysToInclude = [selectedDayFilter];
-    }
+    const keysToInclude = getPeriodKeys(selectedDayFilter, 0);
 
     keysToInclude.forEach((key, index) => {
         const dayData = allHistory[key] || { watchTime: 0, activeTime: 0, videos: [] };
@@ -173,7 +232,8 @@ function renderMainTrendsChart(data) {
     if (!chartContainer) return;
 
     if (data.days.length === 0) {
-        chartContainer.innerHTML = '<div class="no-data-msg">No data for this period</div>';
+        const isFuture = isFutureDate(selectedDayFilter);
+        chartContainer.innerHTML = `<div class="no-data-msg">${isFuture ? 'Future Date - No activity yet' : 'No data for this period'}</div>`;
         return;
     }
 
@@ -307,8 +367,9 @@ function renderWatchDistribution(data) {
     if (centerVal) centerVal.textContent = formatTimeShort(data.totalWatchTime);
 
     if (data.totalWatchTime === 0 || data.channels.length === 0) {
+        const isFuture = isFutureDate(selectedDayFilter);
         pieChart.style.background = 'var(--stats-chart-bar-bg)';
-        pieLegend.innerHTML = '<div class="legend-empty">No activity recorded</div>';
+        pieLegend.innerHTML = `<div class="legend-empty">${isFuture ? 'Future date' : 'No activity recorded'}</div>`;
         return;
     }
 
@@ -539,14 +600,18 @@ function renderActivityHeatmap() {
     const days = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
     if (selectedHeatmapYear === 'Last 365 Days') {
-        weeks = 53; // Full year sliding window
         endDate = new Date(now);
         startDate = new Date(now);
-        startDate.setDate(now.getDate() - (weeks * 7) + 1);
-        // Align to Sunday
+        startDate.setDate(now.getDate() - 364);
+        // Align start to Sunday
         while (startDate.getDay() !== 0) {
             startDate.setDate(startDate.getDate() - 1);
         }
+        // Calculate weeks needed to cover from aligned startDate to today
+        const diffTime = Math.abs(endDate - startDate);
+        weeks = Math.ceil((diffTime + (1000 * 60 * 60 * 24)) / (1000 * 60 * 60 * 24 * 7));
+        // Ensure at least 53 weeks for consistent "Year" look
+        if (weeks < 53) weeks = 53;
     } else {
         const year = parseInt(selectedHeatmapYear);
         startDate = new Date(year, 0, 1);
@@ -555,9 +620,16 @@ function renderActivityHeatmap() {
         while (startDate.getDay() !== 0) {
             startDate.setDate(startDate.getDate() - 1);
         }
-        // Calculate weeks needed to cover the whole year
-        const diffTime = Math.abs(endDate - startDate);
-        weeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+        // Calculate weeks needed to cover the whole year (or until today if current year)
+        const targetEnd = (year === now.getFullYear()) ? new Date(now) : endDate;
+        const diffTime = Math.abs(targetEnd - startDate);
+        weeks = Math.ceil((diffTime + (1000 * 60 * 60 * 24)) / (1000 * 60 * 60 * 24 * 7));
+        
+        // However, the grid usually looks better if fully rendered for the selected year
+        if (year !== now.getFullYear()) {
+            const yearDiff = Math.abs(endDate - startDate);
+            weeks = Math.ceil((yearDiff + (1000 * 60 * 60 * 24)) / (1000 * 60 * 60 * 24 * 7));
+        }
     }
     
     let heatmapData = [];
@@ -639,37 +711,94 @@ function renderActivityHeatmap() {
     initCustomScroll('activity-heatmap', 'heatmap-scroll-left', 'heatmap-scroll-right');
 }
 
-function renderDetailedInsights(data) {
+function renderDetailedInsights(currentData) {
     const insightEl = document.getElementById('key-insights');
     if (!insightEl) return;
 
     const insights = [];
+    const filter = selectedDayFilter;
+    const isSingleDay = filter === 'today' || filter === 'yesterday' || (filter && filter.includes('-'));
+    
+    // 1. Fetch Comparison Data
+    const currentKeys = getPeriodKeys(filter, 0);
+    const prevKeys = getPeriodKeys(filter, 1);
+    
+    const currentStats = getPeriodSummary(currentKeys);
+    const prevStats = getPeriodSummary(prevKeys);
 
-    // insight 1: Peak Activity
-    if (data.maxDay.value > 0) {
+    // Handle Empty / Future States
+    if (currentStats.totalTime === 0) {
+        const isFuture = isFutureDate(filter);
+        insightEl.innerHTML = `
+            <div class="insight-card-modern empty-state-card">
+                <div class="insight-header-row">
+                    <span class="insight-icon-vibrant">${isFuture ? '📅' : '🏝️'}</span>
+                    <h4>${isFuture ? 'Future Date' : 'Activity Empty'}</h4>
+                </div>
+                <p>${isFuture ? 'This date is in the future. No data available yet.' : 'No activity recorded for this day. Go watch some videos!'}</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Insight: Trend Analysis
+    if (prevStats.totalTime > 0) {
+        const diff = currentStats.totalTime - prevStats.totalTime;
+        const percent = Math.round((Math.abs(diff) / prevStats.totalTime) * 100);
+        const direction = diff >= 0 ? 'more' : 'less';
+        const trendIcon = diff >= 0 ? '📈' : '📉';
+        const periodLabel = isSingleDay ? (filter === 'today' ? 'yesterday' : 'the day before') : 'previous period';
+        
         insights.push({
-            icon: '🔥',
-            title: 'Peak Activity',
-            text: `Your highest watch time was on <strong>${data.maxDay.key}</strong> with <strong>${formatTime(Math.round(data.maxDay.value))}</strong>.`
+            icon: trendIcon,
+            title: 'Trend Analysis',
+            text: `You watched <strong>${percent}% ${direction}</strong> content compared to ${periodLabel}.`
         });
     }
 
-    // insight 2: Consistency
-    const activeDays = data.days.filter(d => d.value > 0).length;
-    const consistency = Math.round((activeDays / data.days.length) * 100);
-    insights.push({
-        icon: '🎯',
-        title: 'Consistency',
-        text: `You watched YouTube on <strong>${activeDays}</strong> out of the last <strong>${data.days.length}</strong> days (${consistency}%).`
-    });
+    // Insight: Top Activity / Highlights
+    if (isSingleDay) {
+        if (currentStats.topChannel.time > 0) {
+            insights.push({
+                icon: '📺',
+                title: 'Top Channel',
+                text: `You spent most of your time on <strong>${currentStats.topChannel.name}</strong>.`
+            });
+        }
+    } else {
+        if (currentData.maxDay.value > 0) {
+            insights.push({
+                icon: '🔥',
+                title: 'Peak Activity',
+                text: `Your highest watch time was on <strong>${currentData.maxDay.key}</strong> with <strong>${formatTime(Math.round(currentData.maxDay.value))}</strong>.`
+            });
+        }
+        
+        const avg = currentStats.totalTime / currentData.days.length;
+        insights.push({
+            icon: '📊',
+            title: 'Daily Average',
+            text: `You are averaging <strong>${formatTimeShort(avg)}</strong> of watch time per day.`
+        });
+        
+        const consistency = Math.round((currentStats.activeDays / currentData.days.length) * 100);
+        insights.push({
+            icon: '🎯',
+            title: 'Consistency',
+            text: `You watched YouTube on <strong>${currentStats.activeDays}</strong> out of the last <strong>${currentData.days.length}</strong> days (${consistency}%).`
+        });
+    }
 
-    // insight 3: Binge-watching check
-    const bingeDays = data.days.filter(d => d.value > 10800).length; // 3 hours
+    // Insight: Binge Warning
+    const bingeThreshold = 3 * 3600; // 3 hours
+    const bingeDays = currentData.days.filter(d => d.value > bingeThreshold).length;
     if (bingeDays > 0) {
         insights.push({
             icon: '⚠️',
             title: 'Binge Warning',
-            text: `You had <strong>${bingeDays}</strong> sessions exceeding 3 hours. Consider taking more frequent breaks!`
+            text: isSingleDay ? 
+                `High activity detected! You spent over <strong>3 hours</strong> on YouTube today.` :
+                `You had <strong>${bingeDays}</strong> sessions exceeding 3 hours. Consider taking more breaks!`
         });
     }
 

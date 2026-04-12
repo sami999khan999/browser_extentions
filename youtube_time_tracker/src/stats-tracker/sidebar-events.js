@@ -466,7 +466,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       dislikeCountSettings.enabled = dislikeToggle.checked;
       saveDislikeCountSettings();
       // Apply state immediately, force-fetching if enabled
-      applyDislikeCountState(dislikeToggle.checked);
+      applyDislikeCountState();
     };
   }
 
@@ -752,7 +752,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
                        
                        // Apply live side-effects
                        if (typeof applyShortsBlockerState === 'function') applyShortsBlockerState();
-                       if (typeof applyDislikeCountState === 'function') applyDislikeCountState(dislikeCountSettings.enabled);
+                       if (typeof applyDislikeCountState === 'function') applyDislikeCountState();
                    }
 
                    // Give storage.onChanged and DOM a moment to settle for total reliability
@@ -1074,7 +1074,7 @@ function renderBackups() {
 
                         // Apply live side-effects
                         if (typeof applyShortsBlockerState === 'function') applyShortsBlockerState();
-                        if (typeof applyDislikeCountState === 'function') applyDislikeCountState(dislikeCountSettings.enabled);
+                        if (typeof applyDislikeCountState === 'function') applyDislikeCountState();
                     }
 
                     // Give storage.onChanged and DOM a moment to settle for total reliability

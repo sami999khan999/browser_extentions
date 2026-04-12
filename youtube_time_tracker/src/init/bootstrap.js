@@ -27,9 +27,19 @@
         }
     }, 1000);
 
+    // Throttle MutationObserver calls to applyDislikeCountState
+    let dislikeMutationTimer = null;
     const observer = new MutationObserver(() => {
         if (shortsBlockerSettings.enabled) blockShorts();
-        applyDislikeCountState();
+
+        // Throttle dislike checks: at most once every 100ms from mutations
+        if (!dislikeMutationTimer) {
+            dislikeMutationTimer = setTimeout(() => {
+                dislikeMutationTimer = null;
+                applyDislikeCountState();
+            }, 100);
+        }
+
         // Ensure UI is re-injected if YouTube's SPA wipes it
         injectStatsUI();
     });
@@ -43,6 +53,8 @@
     window.addEventListener('yt-navigate-start', () => {
         // Final sync: use cached values, YouTube may have already reset the video element
         updateStats(lastVideoId, true);
+        // Clear dislike state for the upcoming video
+        if (typeof resetDislikeState === 'function') resetDislikeState();
     });
 
     window.addEventListener('yt-page-data-updated', () => {

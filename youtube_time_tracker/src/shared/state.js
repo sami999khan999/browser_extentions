@@ -314,7 +314,7 @@ storage.onChanged.addListener((changes, area) => {
         const newValue = changes.ytt_dislike_settings.newValue;
         if (newValue && typeof newValue === "object") {
           dislikeCountSettings.enabled = newValue.enabled ?? true;
-          applyDislikeCountState(dislikeCountSettings.enabled);
+          applyDislikeCountState();
           needsUIRefresh = true;
         }
       }

@@ -1,4 +1,4 @@
-/* Unified Styles Bundle — Built at: 2026-04-12T14:15:08.288Z */
+/* Unified Styles Bundle — Built at: 2026-04-12T15:47:18.038Z */
 
 /* ─── src/shared/theme.css ─── */
 /* === Theme Variables === */
@@ -2148,6 +2148,26 @@ body.yt-shorts-resizing-active {
     rgba(255, 255, 255, 0.08) 0%,
     rgba(255, 255, 255, 0.03) 100%
   );
+}
+
+.empty-state-card {
+  opacity: 0.8;
+  border-style: dashed !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  min-height: 100px;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.empty-state-card .insight-header-row {
+  justify-content: center;
+}
+
+.empty-state-card p {
+  font-style: italic;
+  opacity: 0.7;
 }
 
 .insight-header-row {
