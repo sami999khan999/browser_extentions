@@ -193,6 +193,13 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch((err) => {
           sendResponse({ success: false, error: err.message });
         });
+    } else if (request.action === "GET_DISLIKE_COUNT") {
+        fetchDislikeFromAPI(request.videoId)
+            .then(data => sendResponse(data))
+            .catch(err => {
+                console.error("BG: Dislike fetch error:", err);
+                sendResponse(null);
+            });
     }
   });
   return true; // Keep message channel open for asynchronous response
@@ -450,6 +457,24 @@ async function fetchZenQuote() {
     },
   ];
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+}
+
+async function fetchDislikeFromAPI(videoId) {
+    console.log(`BG: Fetching dislike count for ${videoId}`);
+    try {
+        const response = await fetch(
+            `https://returnyoutubedislikeapi.com/votes?videoId=${videoId}`
+        );
+        if (!response.ok) {
+            console.error(`BG: API error: ${response.status}`);
+            return null;
+        }
+        const data = await response.json();
+        return data;
+    } catch (e) {
+        console.error("BG: Fetch failed:", e);
+        return null;
+    }
 }
 
 // === Backup Logic ===

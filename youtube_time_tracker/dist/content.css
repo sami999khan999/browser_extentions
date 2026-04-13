@@ -1,4 +1,4 @@
-/* Unified Styles Bundle — Built at: 2026-04-12T15:47:18.038Z */
+/* Unified Styles Bundle — Built at: 2026-04-13T17:36:09.672Z */
 
 /* ─── src/shared/theme.css ─── */
 /* === Theme Variables === */
@@ -85,6 +85,33 @@ body.stats-sidebar-active::-webkit-scrollbar {
 ::-webkit-scrollbar-thumb {
     background: var(--stats-primary) !important;
     border-radius: 0 !important;
+}
+
+/* === Dislike Count Reboot Styles === */
+#ytt-dislike-reboot {
+    font-family: "Roboto", "Arial", sans-serif;
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* Ensure parents don't clip our sibling */
+ytd-watch-metadata #actions,
+ytd-watch-metadata #actions-inner,
+ytd-watch-metadata #menu,
+ytd-segmented-like-dislike-button-renderer {
+    overflow: visible !important;
+}
+
+/* Adjustments for Shorts */
+ytd-reel-video-renderer .ytt-dislike-count-container {
+    height: auto;
+    padding: 0;
+    margin-top: 4px;
+}
+
+ytd-reel-video-renderer #ytt-dislike-count {
+    font-size: 12px;
+    line-height: 1;
 }
 
 
