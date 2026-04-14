@@ -46,6 +46,21 @@ function findAllDeep(selector, root = document, results = []) {
     return results;
 }
 
+function isButtonInComment(btn) {
+    let curr = btn;
+    while (curr && curr !== document.body) {
+        const name = curr.nodeName || "";
+        if (name.includes("COMMENT")) return true;
+        
+        if (curr.parentNode instanceof ShadowRoot) {
+            curr = curr.parentNode.host;
+        } else {
+            curr = curr.parentElement;
+        }
+    }
+    return false;
+}
+
 function findDislikeButton() {
     const selectors = [
         "yt-animated-action-button-view-model:nth-child(2) button",
@@ -56,7 +71,14 @@ function findDislikeButton() {
 
     for (const sel of selectors) {
         const matches = findAllDeep(sel);
-        const visibleBtn = matches.find(isElementVisible);
+        const visibleBtn = matches.find(btn => {
+            if (!isElementVisible(btn)) return false;
+            if (isButtonInComment(btn)) return false;
+
+            const ariaLabel = (btn.getAttribute("aria-label") || "").toLowerCase();
+            const title = (btn.getAttribute("title") || "").toLowerCase();
+            return ariaLabel.includes("dislike") || title.includes("dislike");
+        });
         if (visibleBtn) return visibleBtn;
     }
     return null;
@@ -72,7 +94,14 @@ function findLikeButton() {
 
     for (const sel of selectors) {
         const matches = findAllDeep(sel);
-        const visibleBtn = matches.find(isElementVisible);
+        const visibleBtn = matches.find(btn => {
+            if (!isElementVisible(btn)) return false;
+            if (isButtonInComment(btn)) return false;
+
+            const ariaLabel = (btn.getAttribute("aria-label") || "").toLowerCase();
+            const title = (btn.getAttribute("title") || "").toLowerCase();
+            return (ariaLabel.includes("like") || title.includes("like")) && !ariaLabel.includes("dislike");
+        });
         if (visibleBtn) return visibleBtn;
     }
     return null;
@@ -123,20 +152,33 @@ function initDislikeCounter() {
 function isDislikedState(btn) {
     if (!btn) return false;
     const ariaPressed = btn.getAttribute("aria-pressed") === "true";
-    const ariaLabel = btn.getAttribute("aria-label") || "";
+    const ariaLabel = (btn.getAttribute("aria-label") || "").toLowerCase();
+    
+    // Check for various ways YouTube signals an active state
+    const isLabelActive = ariaLabel.includes("remove") || ariaLabel.includes("disliked");
     const hasActiveClass = btn.classList.contains("yt-spec-button-shape-next--active");
-    const isLabelActive = ariaLabel.toLowerCase().includes("remove");
     return ariaPressed || hasActiveClass || isLabelActive;
 }
 
 function observeButtonStates(videoId, dislikeBtn, likeBtn) {
     if (!dislikeBtn || !likeBtn) return;
     
-    // Cleanup old observers if button changed
-    if (buttonObservers.has(dislikeBtn)) buttonObservers.get(dislikeBtn).disconnect();
-    if (buttonObservers.has(likeBtn)) buttonObservers.get(likeBtn).disconnect();
+    // Cleanup old observers/listeners
+    const cleanup = (btn) => {
+        const obs = buttonObservers.get(btn);
+        if (obs) {
+            if (obs.disconnect) obs.disconnect();
+            if (obs.clickHandler && btn.removeEventListener) {
+                btn.removeEventListener("click", obs.clickHandler);
+            }
+            buttonObservers.delete(btn);
+        }
+    };
 
-    const observer = new MutationObserver(() => {
+    cleanup(dislikeBtn);
+    cleanup(likeBtn);
+
+    const updateCount = () => {
         const data = dislikeDataCache[videoId];
         if (!data) return;
 
@@ -146,26 +188,36 @@ function observeButtonStates(videoId, dislikeBtn, likeBtn) {
         if (currentState !== lastKnownState) {
             if (currentState) {
                 data.dislikes++;
-                console.log("YTT: [Dislike] Internal state change: (+1)");
+                console.log("YTT: [Dislike] State change: Disliked (+1)");
             } else {
                 data.dislikes--;
-                console.log("YTT: [Dislike] Internal state change: (-1)");
+                console.log("YTT: [Dislike] State change: Un-disliked (-1)");
             }
             dislikeBtn.dataset.yttWasDisliked = currentState;
             doRender(data, videoId, dislikeBtn);
         }
+    };
 
-        // Like button interaction: if Like becomes active, YouTube un-dislikes
-        // We implicitly handle this because the Dislike button's aria-pressed 
-        // will flip to false when Like is pressed.
-    });
-
+    // 1. Mutation Observer for attribute changes
+    const observer = new MutationObserver(updateCount);
     const config = { attributes: true, attributeFilter: ["aria-pressed", "aria-label", "class"] };
     observer.observe(dislikeBtn, config);
     observer.observe(likeBtn, config);
 
-    buttonObservers.set(dislikeBtn, observer);
-    buttonObservers.set(likeBtn, observer);
+    // 2. Click listeners for immediate response (sometimes attributes lag)
+    const handleClick = () => {
+        // Small delay to let YouTube's internal state update
+        setTimeout(updateCount, 50);
+        setTimeout(updateCount, 250); // Second check for slow UI updates
+    };
+
+    dislikeBtn.addEventListener("click", handleClick);
+    likeBtn.addEventListener("click", handleClick);
+
+    // Store for future cleanup
+    const record = { disconnect: () => observer.disconnect(), clickHandler: handleClick };
+    buttonObservers.set(dislikeBtn, record);
+    buttonObservers.set(likeBtn, record);
 }
 
 function tryRenderDislike() {
@@ -180,9 +232,9 @@ function tryRenderDislike() {
   const likeBtn = findLikeButton();
   if (!dislikeBtn) return;
 
-  if (dislikeBtn.dataset.yttDislikeVideo === videoId && dislikeBtn.querySelector(".ytt-hijacked-label")) {
-      // Refresh state without full re-render
-      dislikeBtn.dataset.yttWasDisliked = isDislikedState(dislikeBtn);
+  const hasLabel = (dislikeBtn.shadowRoot || dislikeBtn).querySelector(".ytt-hijacked-label");
+  if (dislikeBtn.dataset.yttDislikeVideo === videoId && hasLabel) {
+      // Still on same video and label exists - keep it as is.
       return;
   }
 
@@ -229,6 +281,13 @@ function forceVisibility(btn) {
 }
 
 function doRender(data, videoId, btn) {
+    if (!btn || isButtonInComment(btn)) return;
+
+    // Final sanity check that this is actually a dislike button
+    const ariaLabel = (btn.getAttribute("aria-label") || "").toLowerCase();
+    const title = (btn.getAttribute("title") || "").toLowerCase();
+    if (!ariaLabel.includes("dislike") && !title.includes("dislike")) return;
+
     const countText = formatDislikeCount(data.dislikes);
     let label = findTextSlot(btn);
 

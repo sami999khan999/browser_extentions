@@ -147,17 +147,19 @@ function getSidebarHTML() {
                             <span class="section-icon">${icons.calendar}</span>
                             <h3>Heatmap</h3>
                         </div>
-                        <div id="heatmap-year-selector" class="heatmap-year-selector"></div>
-                        <div class="heatmap-legend">
-                            <span>Less</span>
-                            <div class="legend-cells">
-                                <div class="cell level-0"></div>
-                                <div class="cell level-1"></div>
-                                <div class="cell level-2"></div>
-                                <div class="cell level-3"></div>
-                                <div class="cell level-4"></div>
+                        <div class="heatmap-header-actions">
+                            <div id="heatmap-year-selector" class="heatmap-year-selector"></div>
+                            <div class="heatmap-legend">
+                                <span>Less</span>
+                                <div class="legend-cells">
+                                    <div class="cell level-0"></div>
+                                    <div class="cell level-1"></div>
+                                    <div class="cell level-2"></div>
+                                    <div class="cell level-3"></div>
+                                    <div class="cell level-4"></div>
+                                </div>
+                                <span>More</span>
                             </div>
-                            <span>More</span>
                         </div>
                     </div>
                     <div class="heatmap-container-outer">

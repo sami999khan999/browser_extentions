@@ -111,3 +111,17 @@ ytd-reel-video-renderer #ytt-dislike-count {
     line-height: 1;
 }
 
+/* Fix: Prevent extension styles from leaking to comment three-dot menu */
+ytd-comment-thread-renderer ytd-menu-renderer yt-icon-button,
+ytd-comment-thread-renderer ytd-menu-renderer button,
+ytd-comment-renderer ytd-menu-renderer yt-icon-button,
+ytd-comment-renderer ytd-menu-renderer button,
+ytd-comment-action-buttons-renderer ytd-menu-renderer yt-icon-button,
+ytd-comment-action-buttons-renderer ytd-menu-renderer button {
+    background: none !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
