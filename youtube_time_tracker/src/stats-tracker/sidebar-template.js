@@ -192,6 +192,19 @@ function getSidebarHTML() {
                 </div>
             </div>
 
+            <div id="channel-videos-view" style="display: none;">
+                <div class="video-list-container">
+                    <div class="history-header-row">
+                        <h3 id="channel-videos-title">Channel Videos</h3>
+                    </div>
+                    <ul id="channel-videos-list"></ul>
+                    <div id="channel-videos-loading" class="infinite-scroll-loader" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <span>Loading more activity...</span>
+                    </div>
+                </div>
+            </div>
+
             <div id="settings-view" style="display: none;">
                 <div class="settings-section">
                     <h4 class="section-title">Features</h4>

@@ -3,241 +3,271 @@
 /**
  * Global view switcher accessible from all modules
  */
-let viewHistory = ['history']; // Navigation stack
+let viewHistory = ["history"]; // Navigation stack
+let selectedChannelForVideos = null; // Currently viewed channel's videos
 
 /**
- * Synchronizes all UI controls (toggles, inputs, dropdowns) with the current 
+ * Synchronizes all UI controls (toggles, inputs, dropdowns) with the current
  * in-memory global state variables. Used for instant updates after backup restores.
  */
 function syncSettingsUI() {
-    // 0. Syncing based on current selectedDayFilter (no forced reset to 'today' here)
+  // 0. Syncing based on current selectedDayFilter (no forced reset to 'today' here)
 
-    // 1. Toggles
-    const shortsToggle = document.getElementById("shorts-blocker-toggle");
-    if (shortsToggle) shortsToggle.checked = shortsBlockerSettings.enabled;
+  // 1. Toggles
+  const shortsToggle = document.getElementById("shorts-blocker-toggle");
+  if (shortsToggle) shortsToggle.checked = shortsBlockerSettings.enabled;
 
-    const dislikeToggle = document.getElementById("dislike-count-toggle");
-    if (dislikeToggle) dislikeToggle.checked = dislikeCountSettings.enabled;
+  const dislikeToggle = document.getElementById("dislike-count-toggle");
+  if (dislikeToggle) dislikeToggle.checked = dislikeCountSettings.enabled;
 
-    const breakToggle = document.getElementById("break-enabled-toggle");
-    if (breakToggle) breakToggle.checked = breakSettings.enabled;
+  const breakToggle = document.getElementById("break-enabled-toggle");
+  if (breakToggle) breakToggle.checked = breakSettings.enabled;
 
-    const backupEnabledToggle = document.getElementById("backup-enabled-toggle");
-    if (backupEnabledToggle) backupEnabledToggle.checked = backupSettings.enabled;
+  const backupEnabledToggle = document.getElementById("backup-enabled-toggle");
+  if (backupEnabledToggle) backupEnabledToggle.checked = backupSettings.enabled;
 
-    const backupOnCloseToggle = document.getElementById("backup-on-close-toggle");
-    if (backupOnCloseToggle) backupOnCloseToggle.checked = backupSettings.backupOnClose;
+  const backupOnCloseToggle = document.getElementById("backup-on-close-toggle");
+  if (backupOnCloseToggle)
+    backupOnCloseToggle.checked = backupSettings.backupOnClose;
 
-    // 2. Numeric & Text Inputs
-    const intervalValue = document.getElementById("interval-value");
-    if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
+  // 2. Numeric & Text Inputs
+  const intervalValue = document.getElementById("interval-value");
+  if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
 
-    const workUrlInput = document.getElementById("setting-work-url");
-    if (workUrlInput) workUrlInput.value = breakSettings.workUrl;
+  const workUrlInput = document.getElementById("setting-work-url");
+  if (workUrlInput) workUrlInput.value = breakSettings.workUrl;
 
-    const maxBackupsValue = document.getElementById("max-backups-value");
-    if (maxBackupsValue) maxBackupsValue.value = backupSettings.maxBackups || 10;
+  const maxBackupsValue = document.getElementById("max-backups-value");
+  if (maxBackupsValue) maxBackupsValue.value = backupSettings.maxBackups || 10;
 
-    // 3. Custom Dropdowns
-    const syncDropdown = (id, value, map) => {
-        const dropdown = document.getElementById(id);
-        if (!dropdown) return;
-        dropdown.dataset.value = value;
-        const triggerSpan = dropdown.querySelector(".dropdown-trigger span");
-        if (triggerSpan) {
-          triggerSpan.textContent = map[value] || (value + " Days");
-        }
-        
-        const items = dropdown.querySelectorAll(".dropdown-item");
-        items.forEach(item => {
-            item.classList.toggle("active", String(item.dataset.value) === String(value));
-        });
-    };
+  // 3. Custom Dropdowns
+  const syncDropdown = (id, value, map) => {
+    const dropdown = document.getElementById(id);
+    if (!dropdown) return;
+    dropdown.dataset.value = value;
+    const triggerSpan = dropdown.querySelector(".dropdown-trigger span");
+    if (triggerSpan) {
+      triggerSpan.textContent = map[value] || value + " Days";
+    }
 
-    syncDropdown("backup-interval-dropdown", backupSettings.intervalHours, {
-        1: "Every Hour", 6: "Every 6 Hours", 12: "Every 12 Hours", 24: "Every Day", 168: "Every Week"
+    const items = dropdown.querySelectorAll(".dropdown-item");
+    items.forEach((item) => {
+      item.classList.toggle(
+        "active",
+        String(item.dataset.value) === String(value),
+      );
     });
+  };
 
-    syncDropdown("retention-duration-dropdown", retentionSettings.duration, {
-        7: "7 Days", 15: "15 Days", 30: "30 Days", 90: "3 Months", 180: "6 Months", 365: "1 Year", "-1": "Unlimited"
-    });
+  syncDropdown("backup-interval-dropdown", backupSettings.intervalHours, {
+    1: "Every Hour",
+    6: "Every 6 Hours",
+    12: "Every 12 Hours",
+    24: "Every Day",
+    168: "Every Week",
+  });
 
-    syncDropdown("history-period-dropdown", selectedDayFilter, {});
+  syncDropdown("retention-duration-dropdown", retentionSettings.duration, {
+    7: "7 Days",
+    15: "15 Days",
+    30: "30 Days",
+    90: "3 Months",
+    180: "6 Months",
+    365: "1 Year",
+    "-1": "Unlimited",
+  });
 
-    // 4. Special internal UI syncs
-    if (typeof syncHistoryPresets === 'function') syncHistoryPresets();
-    if (typeof updateDateLabel === 'function') updateDateLabel();
+  syncDropdown("history-period-dropdown", selectedDayFilter, {});
+
+  // 4. Special internal UI syncs
+  if (typeof syncHistoryPresets === "function") syncHistoryPresets();
+  if (typeof updateDateLabel === "function") updateDateLabel();
 }
 
 /**
  * Formats a date or preset label for the UI (e.g., "Apr 7, 2026", "Today", or "Last 30 Days").
  */
 const formatDateLabel = (value) => {
-    const map = {
-        "today": "Today", "yesterday": "Yesterday", "7days": "Last 7 Days", "15days": "Last 15 Days", 
-        "30days": "Last 30 Days", "90days": "Last 3 Months", "180days": "Last 6 Months", "365days": "Last Year", "all": "All Time"
-    };
+  const map = {
+    today: "Today",
+    yesterday: "Yesterday",
+    "7days": "Last 7 Days",
+    "15days": "Last 15 Days",
+    "30days": "Last 30 Days",
+    "90days": "Last 3 Months",
+    "180days": "Last 6 Months",
+    "365days": "Last Year",
+    all: "All Time",
+  };
 
-    if (map[value]) return map[value];
+  if (map[value]) return map[value];
 
-    // Check if it's a specific date YYYY-MM-DD
-    const parts = String(value).split("-").map(Number);
-    if (parts.length === 3 && !parts.some(isNaN)) {
-        const d = new Date(parts[0], parts[1] - 1, parts[2]);
-        return d.toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        });
-    }
+  // Check if it's a specific date YYYY-MM-DD
+  const parts = String(value).split("-").map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
 
-    if (String(value).endsWith("days")) {
-        return `Last ${parseInt(value, 10)} Days`;
-    }
+  if (String(value).endsWith("days")) {
+    return `Last ${parseInt(value, 10)} Days`;
+  }
 
-    return value;
+  return value;
 };
 
 /**
  * Updates the current date label in the history view and synchronizes the period dropdown.
  */
 const updateDateLabel = () => {
-    const formatted = formatDateLabel(selectedDayFilter);
-    
-    // 1. Update side navigation label
-    const sideLabel = document.querySelector(".current-date-label");
-    if (sideLabel) sideLabel.textContent = formatted;
+  const formatted = formatDateLabel(selectedDayFilter);
 
-    // 2. Update period dropdown trigger text
-    const histDropdown = document.getElementById("history-period-dropdown");
-    if (histDropdown) {
-        histDropdown.dataset.value = selectedDayFilter;
-        const triggerSpan = histDropdown.querySelector(".dropdown-trigger span");
-        if (triggerSpan) {
-            // Mapping for dropdown specific labels (e.g. "All History" instead of "All Time")
-            const dropdownLabels = { "all": "All History" };
-            triggerSpan.textContent = dropdownLabels[selectedDayFilter] || formatted;
-        }
+  // 1. Update side navigation label
+  const sideLabel = document.querySelector(".current-date-label");
+  if (sideLabel) sideLabel.textContent = formatted;
 
-        // Update active class on items
-        const items = histDropdown.querySelectorAll(".dropdown-item");
-        items.forEach(item => {
-            item.classList.toggle("active", String(item.dataset.value) === String(selectedDayFilter));
-        });
+  // 2. Update period dropdown trigger text
+  const histDropdown = document.getElementById("history-period-dropdown");
+  if (histDropdown) {
+    histDropdown.dataset.value = selectedDayFilter;
+    const triggerSpan = histDropdown.querySelector(".dropdown-trigger span");
+    if (triggerSpan) {
+      // Mapping for dropdown specific labels (e.g. "All History" instead of "All Time")
+      const dropdownLabels = { all: "All History" };
+      triggerSpan.textContent = dropdownLabels[selectedDayFilter] || formatted;
     }
+
+    // Update active class on items
+    const items = histDropdown.querySelectorAll(".dropdown-item");
+    items.forEach((item) => {
+      item.classList.toggle(
+        "active",
+        String(item.dataset.value) === String(selectedDayFilter),
+      );
+    });
+  }
 };
 
 /**
  * Syncs the history period dropdown items with data retention settings.
  */
 const syncHistoryPresets = () => {
-    const dropdown = document.getElementById("history-period-dropdown");
-    if (!dropdown) return;
-    
-    const duration = retentionSettings.duration;
-    const items = dropdown.querySelectorAll(".dropdown-item");
-    
-    items.forEach(item => {
-        const val = item.dataset.value;
-        if (val === 'today' || val === 'yesterday' || val === 'all') {
-            item.style.display = 'block';
-            return;
-        }
-        
-        const days = parseInt(val, 10);
-        if (duration === -1 || days <= duration) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
-        }
-    });
+  const dropdown = document.getElementById("history-period-dropdown");
+  if (!dropdown) return;
 
-    // Update Special chip label
-    const specialItem = dropdown.querySelector('.dropdown-item.special');
-    if (specialItem) {
-        specialItem.textContent = duration === -1 ? "Unlimited History" : (duration + " Days History");
+  const duration = retentionSettings.duration;
+  const items = dropdown.querySelectorAll(".dropdown-item");
+
+  items.forEach((item) => {
+    const val = item.dataset.value;
+    if (val === "today" || val === "yesterday" || val === "all") {
+      item.style.display = "block";
+      return;
     }
+
+    const days = parseInt(val, 10);
+    if (duration === -1 || days <= duration) {
+      item.style.display = "block";
+    } else {
+      item.style.display = "none";
+    }
+  });
+
+  // Update Special chip label
+  const specialItem = dropdown.querySelector(".dropdown-item.special");
+  if (specialItem) {
+    specialItem.textContent =
+      duration === -1 ? "Unlimited History" : duration + " Days History";
+  }
 };
 
-
-
 function switchView(viewName) {
-    // Push to history stack (avoid duplicates at top)
-    if (viewHistory[viewHistory.length - 1] !== viewName) {
-        viewHistory.push(viewName);
-        // Keep stack manageable
-        if (viewHistory.length > 20) viewHistory.shift();
-    }
-    _switchViewInternal(viewName);
+  // Push to history stack (avoid duplicates at top)
+  if (viewHistory[viewHistory.length - 1] !== viewName) {
+    viewHistory.push(viewName);
+    // Keep stack manageable
+    if (viewHistory.length > 20) viewHistory.shift();
+  }
+  _switchViewInternal(viewName);
 }
 
 function _switchViewInternal(viewName) {
-    activeView = viewName;
-    const hView = document.getElementById("history-view");
-    const aView = document.getElementById("analytics-view");
-    const sView = document.getElementById("settings-view");
-    const hFilters = document.getElementById("stats-header-filters");
+  activeView = viewName;
+  const hView = document.getElementById("history-view");
+  const aView = document.getElementById("analytics-view");
+  const sView = document.getElementById("settings-view");
+  const hFilters = document.getElementById("stats-header-filters");
 
-    if (hView) hView.style.display = viewName === "history" ? "block" : "none";
-    if (aView)
-      aView.style.display = viewName === "analytics" ? "block" : "none";
-    if (sView) sView.style.display = viewName === "settings" ? "block" : "none";
-    if (hFilters)
-      hFilters.style.display = "block";
-    
-    const toggleStrip = document.getElementById("history-filter-toggle");
-    if (toggleStrip)
-      toggleStrip.style.display = "flex";
+  if (hView) hView.style.display = viewName === "history" ? "block" : "none";
+  if (aView) aView.style.display = viewName === "analytics" ? "block" : "none";
+  if (sView) sView.style.display = viewName === "settings" ? "block" : "none";
+  if (hFilters) hFilters.style.display = "block";
 
-    const bView = document.getElementById("backup-view");
-    if (bView) bView.style.display = viewName === "backup" ? "block" : "none";
+  const toggleStrip = document.getElementById("history-filter-toggle");
+  if (toggleStrip) toggleStrip.style.display = "flex";
 
-    const cdView = document.getElementById("channel-distribution-view");
-    if (cdView) cdView.style.display = viewName === "channel-distribution" ? "block" : "none";
+  const bView = document.getElementById("backup-view");
+  if (bView) bView.style.display = viewName === "backup" ? "block" : "none";
 
-    const cPopover = document.getElementById("calendar-popover");
-    if (cPopover) cPopover.style.display = "none";
+  const cdView = document.getElementById("channel-distribution-view");
+  if (cdView)
+    cdView.style.display =
+      viewName === "channel-distribution" ? "block" : "none";
 
-    // Update universal view title bar
-    const viewTitleMap = {
-        "history": "Watch History",
-        "analytics": "Analytics",
-        "channel-distribution": "Channel Distribution",
-        "backup": "Backup & Restore",
-        "settings": "Settings"
+  const cvView = document.getElementById("channel-videos-view");
+  if (cvView)
+    cvView.style.display = viewName === "channel-videos" ? "block" : "none";
+
+  const cPopover = document.getElementById("calendar-popover");
+  if (cPopover) cPopover.style.display = "none";
+
+  // Update universal view title bar
+  const viewTitleMap = {
+    history: "Watch History",
+    analytics: "Analytics",
+    "channel-distribution": "Channel Distribution",
+    "channel-videos": "Channel Activity",
+    backup: "Backup & Restore",
+    settings: "Settings",
+  };
+  const titleText = document.getElementById("view-title-text");
+  const backBtn = document.getElementById("view-back-btn");
+  if (titleText) titleText.textContent = viewTitleMap[viewName] || viewName;
+  if (backBtn) {
+    // Always show back button per user request
+    backBtn.style.display = "flex";
+
+    // Update opacity to indicate if there's history to walk back into
+    backBtn.style.opacity = viewHistory.length > 1 ? "1" : "0.5";
+
+    backBtn.onclick = (e) => {
+      e.stopPropagation();
+      // Pop the current view off the stack
+      if (viewHistory.length > 1) {
+        viewHistory.pop(); // remove current
+        const prev = viewHistory[viewHistory.length - 1];
+        _switchViewInternal(prev);
+      } else {
+        // If on root, ensure we stay on history or perform a subtle UI feedback
+        // Providing a consistent "Back" experience as requested
+        _switchViewInternal("history");
+      }
     };
-    const titleText = document.getElementById("view-title-text");
-    const backBtn = document.getElementById("view-back-btn");
-    if (titleText) titleText.textContent = viewTitleMap[viewName] || viewName;
-    if (backBtn) {
-        // Always show back button per user request
-        backBtn.style.display = "flex";
-        
-        // Update opacity to indicate if there's history to walk back into
-        backBtn.style.opacity = viewHistory.length > 1 ? "1" : "0.5";
-        
-        backBtn.onclick = (e) => {
-            e.stopPropagation();
-            // Pop the current view off the stack
-            if (viewHistory.length > 1) {
-                viewHistory.pop(); // remove current
-                const prev = viewHistory[viewHistory.length - 1];
-                _switchViewInternal(prev);
-            } else {
-                // If on root, ensure we stay on history or perform a subtle UI feedback
-                // Providing a consistent "Back" experience as requested
-                _switchViewInternal("history");
-            }
-        };
-    }
+  }
 
-    // Update Button Active States
-    ["nav-history", "nav-analytics", "nav-backup", "nav-settings"].forEach((id) => {
+  // Update Button Active States
+  ["nav-history", "nav-analytics", "nav-backup", "nav-settings"].forEach(
+    (id) => {
       const navBtn = document.getElementById(id);
       if (navBtn) navBtn.classList.toggle("active", id === `nav-${viewName}`);
-    });
+    },
+  );
 
-    if (typeof renderStats === 'function') renderStats();
+  if (typeof renderStats === "function") renderStats();
 }
 
 function bindSidebarEvents(sidebar, btn, dragStatus) {
@@ -263,8 +293,8 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       selectedDayFilter === "today"
         ? todayStr
         : selectedDayFilter === "yesterday"
-        ? getDayKey(new Date(Date.now() - 86400000))
-        : selectedDayFilter;
+          ? getDayKey(new Date(Date.now() - 86400000))
+          : selectedDayFilter;
 
     let html = `
       <div class="calendar-header">
@@ -299,8 +329,8 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
       html += `
         <div class="calendar-day ${isToday ? "today" : ""} ${
-        isSelected ? "selected" : ""
-      }" data-date="${dateKey}">
+          isSelected ? "selected" : ""
+        }" data-date="${dateKey}">
           ${d}
         </div>
       `;
@@ -323,7 +353,8 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     container.querySelectorAll(".calendar-day:not(.empty)").forEach((el) => {
       el.onclick = (e) => {
         e.stopPropagation();
-        selectedDayFilter = el.dataset.date === todayStr ? "today" : el.dataset.date;
+        selectedDayFilter =
+          el.dataset.date === todayStr ? "today" : el.dataset.date;
         container.style.display = "none";
         updateDateLabel();
         renderStats();
@@ -351,7 +382,10 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       current = new Date();
     } else if (selectedDayFilter === "yesterday") {
       current = new Date(Date.now() - 86400000);
-    } else if (selectedDayFilter === "all" || selectedDayFilter.endsWith("days")) {
+    } else if (
+      selectedDayFilter === "all" ||
+      selectedDayFilter.endsWith("days")
+    ) {
       current = new Date();
     } else {
       const parts = selectedDayFilter.split("-").map(Number);
@@ -362,15 +396,23 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       }
     }
     current.setDate(current.getDate() + offset);
-    
+
     const newKey = getDayKey(current);
-    selectedDayFilter = (newKey === getDayKey(new Date())) ? "today" : newKey;
+    selectedDayFilter = newKey === getDayKey(new Date()) ? "today" : newKey;
     updateDateLabel();
     renderStats();
   };
 
-  if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); shiftDate(-1); };
-  if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); shiftDate(1); };
+  if (prevBtn)
+    prevBtn.onclick = (e) => {
+      e.stopPropagation();
+      shiftDate(-1);
+    };
+  if (nextBtn)
+    nextBtn.onclick = (e) => {
+      e.stopPropagation();
+      shiftDate(1);
+    };
 
   // History Period Dropdown Logic
   const histDropdown = document.getElementById("history-period-dropdown");
@@ -433,9 +475,6 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       switchView("settings");
     };
   }
-
-
-
 
   const navToChannels = document.getElementById("nav-to-channels");
   if (navToChannels) {
@@ -587,7 +626,9 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     });
   }
 
-  const retentionDropdown = document.getElementById("retention-duration-dropdown");
+  const retentionDropdown = document.getElementById(
+    "retention-duration-dropdown",
+  );
   if (retentionDropdown) {
     const trigger = retentionDropdown.querySelector(".dropdown-trigger");
     const menu = retentionDropdown.querySelector(".dropdown-menu");
@@ -619,8 +660,8 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
         item.classList.add("active");
 
         // Sync history filters
-        if (typeof syncHistoryPresets === 'function') {
-            syncHistoryPresets();
+        if (typeof syncHistoryPresets === "function") {
+          syncHistoryPresets();
         }
 
         // Close
@@ -628,7 +669,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       };
     });
   }
-  
+
   const maxBackupsMinus = document.getElementById("max-backups-minus");
   const maxBackupsPlus = document.getElementById("max-backups-plus");
   const maxBackupsValue = document.getElementById("max-backups-value");
@@ -677,22 +718,26 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   const deleteBtn = document.getElementById("delete-all-backups");
   if (deleteBtn) {
     deleteBtn.onclick = () => {
-        showConfirmModal({
-            title: "Clear All Backups?",
-            message: "This will permanently delete all stored snapshots in the local database. This action cannot be undone.",
-            confirmText: "Clear All",
-            cancelText: "Cancel",
-            icon: "🗑️",
-            onConfirm: () => {
-                safeSendMessage({ action: "DELETE_ALL_BACKUPS" }, (response) => {
-                    if (response && response.success) {
-                        renderBackups();
-                    } else {
-                        alert("Failed to clear backups: " + (response ? response.error : "Unknown error"));
-                    }
-                });
+      showConfirmModal({
+        title: "Clear All Backups?",
+        message:
+          "This will permanently delete all stored snapshots in the local database. This action cannot be undone.",
+        confirmText: "Clear All",
+        cancelText: "Cancel",
+        icon: "🗑️",
+        onConfirm: () => {
+          safeSendMessage({ action: "DELETE_ALL_BACKUPS" }, (response) => {
+            if (response && response.success) {
+              renderBackups();
+            } else {
+              alert(
+                "Failed to clear backups: " +
+                  (response ? response.error : "Unknown error"),
+              );
             }
-        });
+          });
+        },
+      });
     };
   }
 
@@ -714,15 +759,16 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       reader.onload = (event) => {
         try {
           const importedData = JSON.parse(event.target.result);
-          
+
           // Basic validation
           if (!importedData.allHistory && !importedData.shortsBlockerSettings) {
-             throw new Error("Invalid backup file format");
+            throw new Error("Invalid backup file format");
           }
 
           showConfirmModal({
             title: "Import Backup?",
-            message: "This will overwrite your current history and settings. Are you sure?",
+            message:
+              "This will overwrite your current history and settings. Are you sure?",
             confirmText: "Import & Restore",
             cancelText: "Cancel",
             icon: "📥",
@@ -730,63 +776,84 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
               importBtn.disabled = true;
               importBtn.textContent = "Importing...";
 
-              safeSendMessage({ action: "IMPORT_BACKUP", clientData: importedData }, (response) => {
-                importBtn.disabled = false;
-                importBtn.textContent = "Import JSON";
-                fileInput.value = ""; // Reset input
+              safeSendMessage(
+                { action: "IMPORT_BACKUP", clientData: importedData },
+                (response) => {
+                  importBtn.disabled = false;
+                  importBtn.textContent = "Import JSON";
+                  fileInput.value = ""; // Reset input
 
-                if (response && response.success) {
-                   // Refresh everything instantly without reload
-                   // Explicitly update local state variables from response to avoid race conditions
-                   if (response.settings) {
-                       const s = response.settings;
-                       if (s.ytt_shorts_settings) shortsBlockerSettings.enabled = s.ytt_shorts_settings.enabled;
-                       if (s.ytt_dislike_settings) dislikeCountSettings.enabled = s.ytt_dislike_settings.enabled;
-                       if (s.ytt_break_settings) {
-                           breakSettings.enabled = s.ytt_break_settings.enabled;
-                           breakSettings.intervalMinutes = s.ytt_break_settings.intervalMinutes;
-                           breakSettings.workUrl = s.ytt_break_settings.workUrl;
-                       }
-                       if (s.ytt_backup_settings) backupSettings = { ...backupSettings, ...s.ytt_backup_settings };
-                       if (s.ytt_retention_settings) retentionSettings = { ...retentionSettings, ...s.ytt_retention_settings };
-                       
-                       // Apply live side-effects
-                       if (typeof applyShortsBlockerState === 'function') applyShortsBlockerState();
-                       if (typeof applyDislikeCountState === 'function') applyDislikeCountState();
-                   }
+                  if (response && response.success) {
+                    // Refresh everything instantly without reload
+                    // Explicitly update local state variables from response to avoid race conditions
+                    if (response.settings) {
+                      const s = response.settings;
+                      if (s.ytt_shorts_settings)
+                        shortsBlockerSettings.enabled =
+                          s.ytt_shorts_settings.enabled;
+                      if (s.ytt_dislike_settings)
+                        dislikeCountSettings.enabled =
+                          s.ytt_dislike_settings.enabled;
+                      if (s.ytt_break_settings) {
+                        breakSettings.enabled = s.ytt_break_settings.enabled;
+                        breakSettings.intervalMinutes =
+                          s.ytt_break_settings.intervalMinutes;
+                        breakSettings.workUrl = s.ytt_break_settings.workUrl;
+                      }
+                      if (s.ytt_backup_settings)
+                        backupSettings = {
+                          ...backupSettings,
+                          ...s.ytt_backup_settings,
+                        };
+                      if (s.ytt_retention_settings)
+                        retentionSettings = {
+                          ...retentionSettings,
+                          ...s.ytt_retention_settings,
+                        };
 
-                   // Give storage.onChanged and DOM a moment to settle for total reliability
-                   setTimeout(() => {
-                        selectedDayFilter = 'today'; // Reset filter specifically for imports
-                        syncSettingsUI();
-                        switchView("history");
-                        renderStats();
-                        renderBackups();
-                   }, 50);
-                   
-                   // Show success feedback
-                   const originalHtml = importBtn.innerHTML;
-                   importBtn.textContent = "Imported!";
-                   importBtn.style.color = "#2ecc71";
-                   setTimeout(() => {
+                      // Apply live side-effects
+                      if (typeof applyShortsBlockerState === "function")
+                        applyShortsBlockerState();
+                      if (typeof applyDislikeCountState === "function")
+                        applyDislikeCountState();
+                    }
+
+                    // Give storage.onChanged and DOM a moment to settle for total reliability
+                    setTimeout(() => {
+                      selectedDayFilter = "today"; // Reset filter specifically for imports
+                      syncSettingsUI();
+                      switchView("history");
+                      renderStats();
+                      renderBackups();
+                    }, 50);
+
+                    // Show success feedback
+                    const originalHtml = importBtn.innerHTML;
+                    importBtn.textContent = "Imported!";
+                    importBtn.style.color = "#2ecc71";
+                    setTimeout(() => {
                       importBtn.innerHTML = originalHtml;
                       importBtn.style.color = "";
-                   }, 2000);
-                } else {
+                    }, 2000);
+                  } else {
                     showAlertModal({
-                        title: "Import Failed",
-                        message: response ? response.error : "Unknown error occurred during import.",
-                        icon: "❌"
+                      title: "Import Failed",
+                      message: response
+                        ? response.error
+                        : "Unknown error occurred during import.",
+                      icon: "❌",
                     });
-                }
-              });
-            }
+                  }
+                },
+              );
+            },
           });
         } catch (err) {
           showAlertModal({
-              title: "Invalid File",
-              message: "The selected file is not a valid YouTube Time Tracker backup. Please check the JSON format.",
-              icon: "⚠️"
+            title: "Invalid File",
+            message:
+              "The selected file is not a valid YouTube Time Tracker backup. Please check the JSON format.",
+            icon: "⚠️",
           });
           fileInput.value = "";
         }
@@ -870,53 +937,58 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
   if (toggleBtn && subheader) {
     const toggleFilters = (forceState) => {
-        const isCollapsed = subheader.classList.contains("collapsed");
-        const shouldCollapse = forceState !== undefined ? !forceState : !isCollapsed;
-        
-        subheader.classList.toggle("collapsed", shouldCollapse);
-        toggleBtn.classList.toggle("expanded", !shouldCollapse);
-        
-        // Update icon based on state
-        toggleBtn.innerHTML = shouldCollapse ? icons.chevron_down : icons.chevron_up;
+      const isCollapsed = subheader.classList.contains("collapsed");
+      const shouldCollapse =
+        forceState !== undefined ? !forceState : !isCollapsed;
+
+      subheader.classList.toggle("collapsed", shouldCollapse);
+      toggleBtn.classList.toggle("expanded", !shouldCollapse);
+
+      // Update icon based on state
+      toggleBtn.innerHTML = shouldCollapse
+        ? icons.chevron_down
+        : icons.chevron_up;
     };
 
     toggleBtn.onclick = (e) => {
-        e.stopPropagation();
-        toggleFilters();
+      e.stopPropagation();
+      toggleFilters();
     };
 
     // "Drag down" feel - simple version: click on strip also toggles
     if (toggleStrip) {
-        let startY = 0;
-        toggleStrip.onmousedown = (e) => {
-            startY = e.clientY;
-            
-            const onMouseMove = (moveEvent) => {
-                const dy = moveEvent.clientY - startY;
-                if (dy > 20) { // Dragged down enough
-                    toggleFilters(true); // Expand
-                    cleanup();
-                } else if (dy < -20) { // Dragged up enough
-                    toggleFilters(false); // Collapse
-                    cleanup();
-                }
-            };
-            
-            const cleanup = () => {
-                document.removeEventListener("mousemove", onMouseMove);
-                document.removeEventListener("mouseup", cleanup);
-            };
-            
-            document.addEventListener("mousemove", onMouseMove);
-            document.addEventListener("mouseup", cleanup);
+      let startY = 0;
+      toggleStrip.onmousedown = (e) => {
+        startY = e.clientY;
+
+        const onMouseMove = (moveEvent) => {
+          const dy = moveEvent.clientY - startY;
+          if (dy > 20) {
+            // Dragged down enough
+            toggleFilters(true); // Expand
+            cleanup();
+          } else if (dy < -20) {
+            // Dragged up enough
+            toggleFilters(false); // Collapse
+            cleanup();
+          }
         };
-        
-        // Also allow clicking the strip itself to toggle
-        toggleStrip.onclick = (e) => {
-            if (e.target === toggleStrip) {
-                toggleFilters();
-            }
+
+        const cleanup = () => {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", cleanup);
         };
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", cleanup);
+      };
+
+      // Also allow clicking the strip itself to toggle
+      toggleStrip.onclick = (e) => {
+        if (e.target === toggleStrip) {
+          toggleFilters();
+        }
+      };
     }
   }
 
@@ -966,24 +1038,29 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   const statsBody = sidebar.querySelector(".stats-body");
   if (statsBody) {
     statsBody.onscroll = () => {
-        if (activeView !== 'history') return;
-        
-        // Trigger if we are 200px from the bottom
-        const threshold = 200;
-        const remaining = statsBody.scrollHeight - (statsBody.scrollTop + statsBody.clientHeight);
-        
-        if (remaining < threshold) {
-            appendHistoryBatch();
+      if (activeView !== "history" && activeView !== "channel-videos") return;
+
+      // Trigger if we are 200px from the bottom
+      const threshold = 200;
+      const remaining =
+        statsBody.scrollHeight - (statsBody.scrollTop + statsBody.clientHeight);
+
+      if (remaining < threshold) {
+        if (activeView === "history") {
+          appendHistoryBatch();
+        } else if (activeView === "channel-videos") {
+          appendChannelVideosBatch();
         }
+      }
     };
   }
 
   // Close on click outside
   document.addEventListener("click", (e) => {
     if (popover && !popover.contains(e.target) && e.target !== trigger) {
-        popover.style.display = "none";
+      popover.style.display = "none";
     }
-    
+
     if (isStatsOpen && !sidebar.contains(e.target) && e.target !== btn) {
       isStatsOpen = false;
       sidebar.classList.remove("open");
@@ -1051,45 +1128,67 @@ function renderBackups() {
         const id = e.currentTarget.dataset.id;
         showConfirmModal({
           title: "Restore this Backup?",
-          message: "This will completely overwrite your current history and settings with data from this snapshot. Are you sure?",
+          message:
+            "This will completely overwrite your current history and settings with data from this snapshot. Are you sure?",
           confirmText: "Restore Now",
           cancelText: "Cancel",
           icon: "🔄",
           onConfirm: () => {
-             safeSendMessage({ action: "RESTORE_BACKUP", id: id }, (response) => {
-                 if (response && response.success) {
-                    // Success feedback: sync UI instantly
-                    // Explicitly update local state variables from response to avoid race conditions
-                    if (response.settings) {
-                        const s = response.settings;
-                        if (s.ytt_shorts_settings) shortsBlockerSettings.enabled = s.ytt_shorts_settings.enabled;
-                        if (s.ytt_dislike_settings) dislikeCountSettings.enabled = s.ytt_dislike_settings.enabled;
-                        if (s.ytt_break_settings) {
-                            breakSettings.enabled = s.ytt_break_settings.enabled;
-                            breakSettings.intervalMinutes = s.ytt_break_settings.intervalMinutes;
-                            breakSettings.workUrl = s.ytt_break_settings.workUrl;
-                        }
-                        if (s.ytt_backup_settings) backupSettings = { ...backupSettings, ...s.ytt_backup_settings };
-                        if (s.ytt_retention_settings) retentionSettings = { ...retentionSettings, ...s.ytt_retention_settings };
-
-                        // Apply live side-effects
-                        if (typeof applyShortsBlockerState === 'function') applyShortsBlockerState();
-                        if (typeof applyDislikeCountState === 'function') applyDislikeCountState();
+            safeSendMessage(
+              { action: "RESTORE_BACKUP", id: id },
+              (response) => {
+                if (response && response.success) {
+                  // Success feedback: sync UI instantly
+                  // Explicitly update local state variables from response to avoid race conditions
+                  if (response.settings) {
+                    const s = response.settings;
+                    if (s.ytt_shorts_settings)
+                      shortsBlockerSettings.enabled =
+                        s.ytt_shorts_settings.enabled;
+                    if (s.ytt_dislike_settings)
+                      dislikeCountSettings.enabled =
+                        s.ytt_dislike_settings.enabled;
+                    if (s.ytt_break_settings) {
+                      breakSettings.enabled = s.ytt_break_settings.enabled;
+                      breakSettings.intervalMinutes =
+                        s.ytt_break_settings.intervalMinutes;
+                      breakSettings.workUrl = s.ytt_break_settings.workUrl;
                     }
+                    if (s.ytt_backup_settings)
+                      backupSettings = {
+                        ...backupSettings,
+                        ...s.ytt_backup_settings,
+                      };
+                    if (s.ytt_retention_settings)
+                      retentionSettings = {
+                        ...retentionSettings,
+                        ...s.ytt_retention_settings,
+                      };
 
-                    // Give storage.onChanged and DOM a moment to settle for total reliability
-                    setTimeout(() => {
-                        selectedDayFilter = 'today'; // Reset filter specifically for restores
-                        syncSettingsUI();
-                        switchView("history");
-                        renderStats();
-                        renderBackups();
-                    }, 50);
-                 } else {
-                    alert("Failed to restore: " + (response ? response.error : "Unknown error"));
-                 }
-             });
-          }
+                    // Apply live side-effects
+                    if (typeof applyShortsBlockerState === "function")
+                      applyShortsBlockerState();
+                    if (typeof applyDislikeCountState === "function")
+                      applyDislikeCountState();
+                  }
+
+                  // Give storage.onChanged and DOM a moment to settle for total reliability
+                  setTimeout(() => {
+                    selectedDayFilter = "today"; // Reset filter specifically for restores
+                    syncSettingsUI();
+                    switchView("history");
+                    renderStats();
+                    renderBackups();
+                  }, 50);
+                } else {
+                  alert(
+                    "Failed to restore: " +
+                      (response ? response.error : "Unknown error"),
+                  );
+                }
+              },
+            );
+          },
         });
       };
 
@@ -1103,26 +1202,28 @@ function renderBackups() {
         chrome.runtime.sendMessage(
           { action: "GET_BACKUPS" },
           (allFullBackups) => {
-            // Wait, GET_BACKUPS in background now returns metadata only? 
+            // Wait, GET_BACKUPS in background now returns metadata only?
             // I should have a GET_BACKUP_BY_ID in background.
           },
         );
         // Correct approach: ask background for full data via a new message or use GET_BACKUPS if it returned everything.
         // Actually, my getAllBackups returns metadata only. I need a GET_BACKUP_BY_ID handler.
-        
+
         // Re-routing through background for full data
         safeSendMessage({ action: "GET_BACKUP_FULL", id: id }, (fullBackup) => {
-            if (fullBackup) {
-                const blob = new Blob([JSON.stringify(fullBackup.data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `ytt_backup_${id}_${new Date(fullBackup.timestamp).toISOString().split('T')[0]}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
+          if (fullBackup) {
+            const blob = new Blob([JSON.stringify(fullBackup.data, null, 2)], {
+              type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `ytt_backup_${id}_${new Date(fullBackup.timestamp).toISOString().split("T")[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }
         });
       };
 
@@ -1132,15 +1233,16 @@ function renderBackups() {
         const id = e.currentTarget.dataset.id;
         showConfirmModal({
           title: "Delete Backup?",
-          message: "Are you sure you want to remove this backup? This cannot be undone.",
+          message:
+            "Are you sure you want to remove this backup? This cannot be undone.",
           confirmText: "Delete",
           cancelText: "Cancel",
           icon: "🗑️",
           onConfirm: () => {
-             safeSendMessage({ action: "DELETE_BACKUP", id: id }, () => {
-                 renderBackups();
-             });
-          }
+            safeSendMessage({ action: "DELETE_BACKUP", id: id }, () => {
+              renderBackups();
+            });
+          },
         });
       };
 

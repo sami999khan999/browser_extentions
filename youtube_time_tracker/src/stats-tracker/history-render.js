@@ -59,6 +59,7 @@ function renderStats() {
         return `History for ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`;
     };
 
+    // --- Phase 1: Structural Rebuild (Full render if view/filter changed) ---
     if (activeView === 'history') {
         const titleEl = document.getElementById('history-title');
         if (titleEl) titleEl.textContent = getDisplayTitle();
@@ -67,7 +68,7 @@ function renderStats() {
         const countEl = document.getElementById('videos-count');
         const listEl = document.getElementById('video-history-list');
 
-        // Update basic counts always
+        // Update basic counts
         if (durationEl) {
             if (selectedDayFilter === 'today') {
                 durationEl.parentElement.style.display = 'flex';
@@ -79,7 +80,6 @@ function renderStats() {
         if (watchTimeEl) watchTimeEl.textContent = formatTime(displayWatchTime);
         if (countEl) countEl.textContent = displayVideos.length;
 
-        // Check if we need to rebuild the list structure
         const needsFullRebuild = (activeView !== lastRenderedView || 
                                   selectedDayFilter !== lastRenderedFilter || 
                                   displayVideos.length !== lastVideoCount);
@@ -94,7 +94,6 @@ function renderStats() {
                 fullSortedVideos = [];
                 loadedVideoCount = 0;
             } else {
-                // Sort by lastStarted descending (fallback to lastUpdated for existing data)
                 fullSortedVideos = displayVideos.slice().sort((a, b) => {
                     const aTime = a.lastStarted || a.lastUpdated || 0;
                     const bTime = b.lastStarted || b.lastUpdated || 0;
@@ -104,18 +103,44 @@ function renderStats() {
                 loadedVideoCount = 0;
                 appendHistoryBatch();
             }
-        } else if (listEl && activeView === 'history') {
-            // High-frequency UI sync for ALL videos across multiple tabs
+        }
+    } else if (activeView === 'channel-distribution') {
+        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
+            lastRenderedView = activeView;
+            lastRenderedFilter = selectedDayFilter;
+            renderChannelDistribution(getFilteredAnalyticsData());
+        }
+    } else if (activeView === 'channel-videos') {
+        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
+            lastRenderedView = activeView;
+            lastRenderedFilter = selectedDayFilter;
+            renderChannelVideosView(selectedChannelForVideos);
+        }
+    } else {
+        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
+            lastRenderedView = activeView;
+            lastRenderedFilter = selectedDayFilter;
+            renderAnalyticsView();
+        }
+    }
+
+    // --- Phase 2: High-Frequency UI Synchronization (Runs every tick) ---
+    if (activeView === 'history' || activeView === 'channel-videos') {
+        const targetListId = activeView === 'history' ? 'video-history-list' : 'channel-videos-list';
+        const targetList = document.getElementById(targetListId);
+        
+        if (targetList) {
+            const targetVideos = activeView === 'history' ? 
+                displayVideos : 
+                displayVideos.filter(v => v.channelName === selectedChannelForVideos);
+
+            // Determine which video should be at the top
             let topVideoUid = null;
-            
-            // 1. Determine which video SHOULD be at the top
-            // Rule: Local video wins if playing, otherwise most recent global starter.
-            const localVideo = displayVideos.find(v => v.uid === currentUid);
+            const localVideo = targetVideos.find(v => v.uid === currentUid);
             if (localVideo && localVideo.isPlaying) {
                 topVideoUid = localVideo.uid;
             } else {
-                // Find most recently started video across all tabs
-                const latestGlobal = [...displayVideos].sort((a, b) => {
+                const latestGlobal = [...targetVideos].sort((a, b) => {
                     const aTime = a.lastStarted || a.lastUpdated || 0;
                     const bTime = b.lastStarted || b.lastUpdated || 0;
                     return bTime - aTime;
@@ -123,15 +148,14 @@ function renderStats() {
                 if (latestGlobal) topVideoUid = latestGlobal.uid;
             }
 
-            displayVideos.forEach(videoData => {
-                const item = listEl.querySelector(`.history-item[data-uid="${videoData.uid}"]`);
+            targetVideos.forEach(videoData => {
+                const item = targetList.querySelector(`.history-item[data-uid="${videoData.uid}"]`);
                 if (item) {
                     const isActive = videoData.uid === currentUid;
                     item.classList.toggle('active-tab-video', isActive);
                     
-                    // Re-order logic: Move the designated top video to the first position
                     if (videoData.uid === topVideoUid && item.previousElementSibling) {
-                        listEl.prepend(item);
+                        targetList.prepend(item);
                     }
 
                     const timeEl = item.querySelector('.time-readout');
@@ -140,9 +164,7 @@ function renderStats() {
                     const percent = videoData.totalDuration > 0 ? Math.round((videoData.watchedDuration / videoData.totalDuration) * 100) : 0;
                     
                     const newTimeText = `${formatTime(Math.round(videoData.currentPosition || 0))} / ${formatTime(Math.round(videoData.totalDuration))}`;
-                    if (timeEl && timeEl.textContent !== newTimeText) {
-                        timeEl.textContent = newTimeText;
-                    }
+                    if (timeEl && timeEl.textContent !== newTimeText) timeEl.textContent = newTimeText;
 
                     if (percentEl) {
                         const watchedTimeText = formatTime(Math.round(videoData.watchedDuration));
@@ -152,39 +174,121 @@ function renderStats() {
                         }
 
                         const percentText = `${percent}%`;
-                        if (percentEl.textContent !== percentText) {
-                            percentEl.textContent = percentText;
-                        }
+                        if (percentEl.textContent !== percentText) percentEl.textContent = percentText;
                     }
 
                     if (progressBar) {
                         const barPercent = videoData.totalDuration > 0 ? Math.min(100, ((videoData.currentPosition || 0) / videoData.totalDuration) * 100) : 0;
                         const newWidth = `${barPercent}%`;
-                        if (progressBar.style.width !== newWidth) {
-                            progressBar.style.width = newWidth;
-                        }
-                    }
-                    const newPos = Math.floor(videoData.currentPosition || 0);
-                    if (item.dataset.time !== String(newPos)) {
-                        item.dataset.time = newPos;
+                        if (progressBar.style.width !== newWidth) progressBar.style.width = newWidth;
                     }
                 }
             });
         }
     } else if (activeView === 'channel-distribution') {
-        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
-            lastRenderedView = activeView;
-            lastRenderedFilter = selectedDayFilter;
-            renderChannelDistribution(getFilteredAnalyticsData());
-        }
-    } else {
-        if (activeView !== lastRenderedView || selectedDayFilter !== lastRenderedFilter) {
-            lastRenderedView = activeView;
-            lastRenderedFilter = selectedDayFilter;
-            renderAnalyticsView();
+        const listEl = document.getElementById('full-channel-list');
+        if (listEl) {
+            const chanMap = {};
+            displayVideos.forEach(v => {
+                const c = v.channelName || 'Unknown Channel';
+                chanMap[c] = (chanMap[c] || 0) + (v.watchedDuration || 0);
+            });
+
+            Object.entries(chanMap).forEach(([chanName, duration]) => {
+                const card = listEl.querySelector(`.channel-card-detailed[data-channel="${chanName}"]`);
+                if (card) {
+                    const percent = displayWatchTime > 0 ? Math.round((duration / displayWatchTime) * 100) : 0;
+                    
+                    const timeSpan = card.querySelector('.channel-stats-row span:first-child');
+                    if (timeSpan) {
+                        const newTimeText = formatTime(Math.round(duration));
+                        if (timeSpan.textContent !== newTimeText) timeSpan.textContent = newTimeText;
+                    }
+
+                    const percentEl = card.querySelector('.channel-percent-detailed');
+                    if (percentEl) {
+                        const newPercentText = `${percent}%`;
+                        if (percentEl.textContent !== newPercentText) percentEl.textContent = newPercentText;
+                    }
+
+                    const progressBar = card.querySelector('.channel-progress-fill');
+                    if (progressBar) {
+                        const newWidth = `${percent}%`;
+                        if (progressBar.style.width !== newWidth) progressBar.style.width = newWidth;
+                    }
+                }
+            });
         }
     }
 }
+function createVideoItemElement(v) {
+    const li = document.createElement('li');
+    const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
+    const isActive = v.uid === currentUid;
+    
+    li.className = `history-item ${isActive ? 'active-tab-video' : ''}`;
+    li.dataset.videoId = v.id;
+    li.dataset.uid = v.uid;
+    li.dataset.time = Math.floor(v.currentPosition || 0);
+    
+    li.innerHTML = `
+        <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
+        <div class="history-info">
+            <div class="video-header-row">
+                <div style="flex: 1; min-width: 0;">
+                    <span class="video-title" title="${v.title}">${v.title}</span>
+                    <span class="video-channel">${v.channelName || ''}</span>
+                </div>
+                <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
+            </div>
+            <div class="video-meta">
+                <span class="time-readout">${formatTime(Math.round(v.currentPosition || 0))} / ${formatTime(Math.round(v.totalDuration))}</span>
+                <div class="watch-stats">
+                    <div class="watched-badge">
+                        <span>${formatTime(Math.round(v.watchedDuration))}</span>
+                    </div>
+                    <span class="video-percent">${percent}%</span>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: ${v.totalDuration > 0 ? Math.min(100, ((v.currentPosition || 0) / v.totalDuration) * 100) : 0}%"></div>
+            </div>
+        </div>
+    `;
+
+    li.onclick = (e) => {
+        e.stopPropagation();
+        const vid = li.dataset.videoId;
+        const t = li.dataset.time;
+        if (vid && vid !== 'undefined') {
+            window.location.href = `https://www.youtube.com/watch?v=${vid}&t=${t}s`;
+        }
+    };
+
+    const delBtn = li.querySelector('.delete-video-btn');
+    if (delBtn) {
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            const uid = li.dataset.uid;
+            const videoTitle = li.querySelector('.video-title').textContent;
+
+            showConfirmModal({
+                title: 'Remove from History?',
+                message: `Are you sure you want to remove "${videoTitle}" from your watch history?`,
+                confirmText: 'Remove',
+                cancelText: 'Cancel',
+                icon: '🗑️',
+                onConfirm: () => {
+                    deleteHistoryVideo(uid);
+                    lastVideoCount = -1; // Force rebuild
+                    renderStats();
+                }
+            });
+        };
+    }
+    return li;
+}
+
 function appendHistoryBatch() {
     const listEl = document.getElementById('video-history-list');
     const loadingEl = document.getElementById('history-loading');
@@ -202,72 +306,7 @@ function appendHistoryBatch() {
         const fragment = document.createDocumentFragment();
         
         batch.forEach(v => {
-            const li = document.createElement('li');
-            const percent = v.totalDuration > 0 ? Math.round((v.watchedDuration / v.totalDuration) * 100) : 0;
-            const isActive = v.uid === currentUid;
-            
-            li.className = `history-item ${isActive ? 'active-tab-video' : ''}`;
-            li.dataset.videoId = v.id;
-            li.dataset.uid = v.uid;
-            li.dataset.time = Math.floor(v.currentPosition || 0);
-            
-            li.innerHTML = `
-                <img class="history-thumb" src="${v.thumbnail}" alt="thumbnail" onerror="this.onerror=null;this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/favicon_144x144.png';">
-                <div class="history-info">
-                    <div class="video-header-row">
-                        <div style="flex: 1; min-width: 0;">
-                            <span class="video-title" title="${v.title}">${v.title}</span>
-                            <span class="video-channel">${v.channelName || ''}</span>
-                        </div>
-                        <button class="delete-video-btn" title="Remove from History">${icons.delete}</button>
-                    </div>
-                    <div class="video-meta">
-                        <span class="time-readout">${formatTime(Math.round(v.currentPosition || 0))} / ${formatTime(Math.round(v.totalDuration))}</span>
-                        <div class="watch-stats">
-                            <div class="watched-badge">
-                                <span>${formatTime(Math.round(v.watchedDuration))}</span>
-                            </div>
-                            <span class="video-percent">${percent}%</span>
-                        </div>
-                    </div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar-fill" style="width: ${v.totalDuration > 0 ? Math.min(100, ((v.currentPosition || 0) / v.totalDuration) * 100) : 0}%"></div>
-                    </div>
-                </div>
-            `;
-
-            li.onclick = (e) => {
-                e.stopPropagation();
-                const vid = li.dataset.videoId;
-                const t = li.dataset.time;
-                if (vid && vid !== 'undefined') {
-                    window.location.href = `https://www.youtube.com/watch?v=${vid}&t=${t}s`;
-                }
-            };
-
-            const delBtn = li.querySelector('.delete-video-btn');
-            if (delBtn) {
-                delBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const uid = li.dataset.uid;
-                    const videoTitle = li.querySelector('.video-title').textContent;
-
-                    showConfirmModal({
-                        title: 'Remove from History?',
-                        message: `Are you sure you want to remove "${videoTitle}" from your watch history?`,
-                        confirmText: 'Remove',
-                        cancelText: 'Cancel',
-                        icon: '🗑️',
-                        onConfirm: () => {
-                            deleteHistoryVideo(uid);
-                            lastVideoCount = -1; // Force rebuild
-                            renderStats();
-                        }
-                    });
-                };
-            }
-            
-            fragment.appendChild(li);
+            fragment.appendChild(createVideoItemElement(v));
         });
 
         listEl.appendChild(fragment);

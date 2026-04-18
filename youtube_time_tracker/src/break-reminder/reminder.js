@@ -226,3 +226,22 @@ function checkBreakReminder() {
         updateTimerBadge(breakSettings.intervalMinutes - elapsed);
     }
 }
+    // Pre-fetch quote 5 seconds before the interval (5/60 minutes)
+    const preFetchThreshold = breakSettings.intervalMinutes - (5 / 60);
+    if (elapsed >= preFetchThreshold && !preFetchedQuote && !isFetchingQuote) {
+        isFetchingQuote = true;
+        fetchZenQuote().then(quote => {
+            preFetchedQuote = quote;
+            isFetchingQuote = false;
+        });
+    }
+
+    if (elapsed >= breakSettings.intervalMinutes && !breakModalShown) {
+        breakModalShown = true;
+        video.pause();
+        showBreakModal(preFetchedQuote);
+        updateTimerBadge(0);
+    } else {
+        updateTimerBadge(breakSettings.intervalMinutes - elapsed);
+    }
+}
