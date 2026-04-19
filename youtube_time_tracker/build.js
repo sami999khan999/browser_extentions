@@ -33,8 +33,10 @@ const JS_FILES = [
     'stats-tracker/sidebar-events.js',
     'stats-tracker/sidebar-ui.js',
     'stats-tracker/fullscreen-auto-hide.js',
+    'stats-tracker/smart-fullscreen.js',
     'stats-tracker/history-render.js',
     'stats-tracker/analytics-render.js',
+    'stats-tracker/shortcuts.js',
 
     // 4. Break Reminder domain
     'break-reminder/reminder.js',

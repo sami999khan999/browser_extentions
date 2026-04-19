@@ -23,6 +23,22 @@ let retentionSettings = {
   duration: 7,
 };
 let dislikeCountSettings = { enabled: true };
+let opacitySettings = { enabled: false, value: 0.5 };
+let smartFullscreenSettings = { enabled: true };
+let keybindSettings = {
+  toggleSidebar: "Alt+S",
+  toggleFloating: "Alt+F",
+  toggleDislike: "Alt+D",
+  toggleShorts: "Alt+B",
+  navHistory: "Alt+Q",
+  navAnalytics: "Alt+W",
+  navChannels: "Alt+E",
+  navBackup: "Alt+R",
+  navSettings: "Alt+T",
+  navShortcuts: "Alt+Y",
+  manualBackup: "Alt+I",
+  toggleOpacity: "Alt+U",
+};
 const youtubeTabs = new Set(); // Tracks active YouTube tabs for the "on close" backup
 
 // Global throttles for multi-tab time tracking
@@ -41,14 +57,55 @@ const loadPromise = new Promise((resolve) => {
       "ytt_backup_settings",
       "ytt_retention_settings",
       "ytt_dislike_settings",
+      "ytt_opacity_settings",
+      "ytt_smart_fullscreen_settings",
+      "ytt_keybind_settings",
     ],
     (data) => {
+      if (data.ytt_smart_fullscreen_settings)
+        smartFullscreenSettings = {
+          ...smartFullscreenSettings,
+          ...data.ytt_smart_fullscreen_settings,
+        };
+      if (data.ytt_keybind_settings)
+        keybindSettings = { ...keybindSettings, ...data.ytt_keybind_settings };
+
       if (data.ytt_retention_settings)
-        retentionSettings = { ...retentionSettings, ...data.ytt_retention_settings };
+        retentionSettings = {
+          ...retentionSettings,
+          ...data.ytt_retention_settings,
+        };
+
+      // Watch for storage changes to keep background memory in sync with UI
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== "local") return;
+
+        if (changes.ytt_shorts_settings)
+          shortsBlockerSettings = changes.ytt_shorts_settings.newValue;
+        if (changes.ytt_break_settings)
+          breakSettings = changes.ytt_break_settings.newValue;
+        if (changes.ytt_backup_settings) {
+          backupSettings = changes.ytt_backup_settings.newValue;
+          scheduleAlarms();
+        }
+        if (changes.ytt_retention_settings)
+          retentionSettings = changes.ytt_retention_settings.newValue;
+        if (changes.ytt_dislike_settings)
+          dislikeCountSettings = changes.ytt_dislike_settings.newValue;
+        if (changes.ytt_opacity_settings)
+          opacitySettings = changes.ytt_opacity_settings.newValue;
+        if (changes.ytt_smart_fullscreen_settings)
+          smartFullscreenSettings = changes.ytt_smart_fullscreen_settings.newValue;
+        if (changes.ytt_keybind_settings)
+          keybindSettings = changes.ytt_keybind_settings.newValue;
+      });
 
       // Enforce retention policy on load
       if (data.ytt_history) {
-        allHistory = cleanupOldHistory(data.ytt_history, retentionSettings.duration);
+        allHistory = cleanupOldHistory(
+          data.ytt_history,
+          retentionSettings.duration,
+        );
         // Save cleaned history back if it changed
         if (
           Object.keys(allHistory).length !==
@@ -64,7 +121,15 @@ const loadPromise = new Promise((resolve) => {
       if (data.ytt_backup_settings)
         backupSettings = { ...backupSettings, ...data.ytt_backup_settings };
       if (data.ytt_dislike_settings)
-        dislikeCountSettings = { ...dislikeCountSettings, ...data.ytt_dislike_settings };
+        dislikeCountSettings = {
+          ...dislikeCountSettings,
+          ...data.ytt_dislike_settings,
+        };
+      if (data.ytt_opacity_settings)
+        opacitySettings = {
+          ...opacitySettings,
+          ...data.ytt_opacity_settings,
+        };
 
       scheduleAlarms();
       console.log("Background: State loaded and cleaned.");
@@ -88,120 +153,152 @@ function cleanupOldHistory(history, days) {
 }
 
 runtime.onMessage.addListener((request, sender, sendResponse) => {
-  loadPromise.then(async () => {
-    if (request.action === "REPORT_WATCH_TIME") {
-      const tabId = sender.tab ? sender.tab.id : null;
-
-      // Track active playing tabs
-      if (tabId) {
-        if (request.isPlaying && request.videoId) {
-          activePlayingTabs[tabId] = {
-            time: Date.now(),
-            videoId: request.videoId,
-            windowId: sender.tab.windowId,
-          };
-        } else {
-          delete activePlayingTabs[tabId];
-        }
+  let isResponded = false;
+  const safeResponse = (data) => {
+    if (!isResponded) {
+      isResponded = true;
+      try {
+        sendResponse(data);
+      } catch (e) {
+        console.warn(
+          "BG: sendResponse failed (channel probably closed):",
+          e.message,
+        );
       }
-
-      // Clean up stale tabs (older than 3 seconds)
-      const now = Date.now();
-      for (const tid in activePlayingTabs) {
-        if (now - activePlayingTabs[tid].time > 3000) {
-          delete activePlayingTabs[tid];
-        }
-      }
-
-      // Check if there is another playing tab with the SAME video
-      let otherPlayingTabId = null;
-      if (request.isPlaying && tabId && request.videoId) {
-        for (const tid in activePlayingTabs) {
-          if (
-            tid !== String(tabId) &&
-            activePlayingTabs[tid].videoId === request.videoId
-          ) {
-            otherPlayingTabId = parseInt(tid, 10);
-            break;
-          }
-        }
-      }
-
-      handleWatchTimeReport(request);
-      sendResponse({ success: true, otherPlayingTabId });
-    } else if (request.action === "SAVE_SETTINGS") {
-      handleSettingsUpdate(request);
-      sendResponse({ success: true });
-    } else if (request.action === "CLOSE_TAB" && sender.tab) {
-      tabs.remove(sender.tab.id);
-      sendResponse({ success: true });
-    } else if (request.action === "CLOSE_TAB_BY_ID") {
-      if (request.tabId) {
-        tabs.remove(request.tabId);
-      }
-      sendResponse({ success: true });
-    } else if (request.action === "DELETE_VIDEO") {
-      handleDeleteVideo(request.uid);
-      sendResponse({ success: true });
-    } else if (request.action === "CLEAR_HISTORY") {
-      handleClearHistory();
-      sendResponse({ success: true });
-    } else if (request.action === "FETCH_QUOTE") {
-      const quote = await fetchZenQuote();
-      sendResponse(quote);
-    } else if (request.action === "GET_BACKUPS") {
-      const backups = await self.yttDB.getAllBackups();
-      sendResponse(backups);
-    } else if (request.action === "CREATE_BACKUP_MANUAL") {
-      await createBackup();
-      sendResponse({ success: true });
-    } else if (request.action === "DELETE_BACKUP") {
-      await self.yttDB.deleteBackup(request.id);
-      sendResponse({ success: true });
-    } else if (request.action === "GET_BACKUP_FULL") {
-      const backup = await self.yttDB.getBackupById(request.id);
-      sendResponse(backup);
-    } else if (request.action === "IMPORT_BACKUP") {
-      handleImportBackup(request.clientData)
-        .then((result) => {
-          sendResponse({ success: result.success, settings: result.settings });
-        })
-        .catch((err) => {
-          sendResponse({ success: false, error: err.message });
-        });
-    } else if (request.action === "RESTORE_BACKUP") {
-      self.yttDB
-        .getBackupById(request.id)
-        .then((backup) => {
-          if (backup) {
-            return handleImportBackup(backup.data);
-          }
-          throw new Error("Backup not found");
-        })
-        .then((result) => {
-          sendResponse({ success: result.success, settings: result.settings });
-        })
-        .catch((err) => {
-          sendResponse({ success: false, error: err.message });
-        });
-    } else if (request.action === "DELETE_ALL_BACKUPS") {
-      self.yttDB
-        .clearAllBackups()
-        .then(() => {
-          sendResponse({ success: true });
-        })
-        .catch((err) => {
-          sendResponse({ success: false, error: err.message });
-        });
-    } else if (request.action === "GET_DISLIKE_COUNT") {
-        fetchDislikeFromAPI(request.videoId)
-            .then(data => sendResponse(data))
-            .catch(err => {
-                console.error("BG: Dislike fetch error:", err);
-                sendResponse(null);
-            });
     }
-  });
+  };
+
+  loadPromise
+    .then(async () => {
+      try {
+        if (request.action === "REPORT_WATCH_TIME") {
+          const tabId = sender.tab ? sender.tab.id : null;
+
+          if (tabId) {
+            if (request.isPlaying && request.videoId) {
+              activePlayingTabs[tabId] = {
+                time: Date.now(),
+                videoId: request.videoId,
+                windowId: sender.tab.windowId,
+              };
+            } else {
+              delete activePlayingTabs[tabId];
+            }
+          }
+
+          const now = Date.now();
+          for (const tid in activePlayingTabs) {
+            if (now - activePlayingTabs[tid].time > 3000) {
+              delete activePlayingTabs[tid];
+            }
+          }
+
+          let otherPlayingTabId = null;
+          if (request.isPlaying && tabId && request.videoId) {
+            for (const tid in activePlayingTabs) {
+              if (
+                tid !== String(tabId) &&
+                activePlayingTabs[tid].videoId === request.videoId
+              ) {
+                otherPlayingTabId = parseInt(tid, 10);
+                break;
+              }
+            }
+          }
+
+          handleWatchTimeReport(request);
+          safeResponse({ success: true, otherPlayingTabId });
+        } else if (request.action === "SAVE_SETTINGS") {
+          handleSettingsUpdate(request);
+          safeResponse({ success: true });
+        } else if (request.action === "CLOSE_TAB" && sender.tab) {
+          tabs.remove(sender.tab.id);
+          safeResponse({ success: true });
+        } else if (request.action === "CLOSE_TAB_BY_ID") {
+          if (request.tabId) {
+            tabs.remove(request.tabId);
+          }
+          safeResponse({ success: true });
+        } else if (request.action === "DELETE_VIDEO") {
+          handleDeleteVideo(request.uid);
+          safeResponse({ success: true });
+        } else if (request.action === "CLEAR_HISTORY") {
+          handleClearHistory();
+          safeResponse({ success: true });
+        } else if (request.action === "FETCH_QUOTE") {
+          const quote = await fetchZenQuote();
+          safeResponse(quote);
+        } else if (request.action === "GET_BACKUPS") {
+          const backups = await self.yttDB.getAllBackups();
+          safeResponse(backups);
+        } else if (request.action === "CREATE_BACKUP_MANUAL") {
+          await createBackup();
+          safeResponse({ success: true });
+        } else if (request.action === "DELETE_BACKUP") {
+          await self.yttDB.deleteBackup(request.id);
+          safeResponse({ success: true });
+        } else if (request.action === "GET_BACKUP_FULL") {
+          const backup = await self.yttDB.getBackupById(request.id);
+          safeResponse(backup);
+        } else if (request.action === "IMPORT_BACKUP") {
+          handleImportBackup(request.clientData)
+            .then((result) => {
+              safeResponse({
+                success: result.success,
+                settings: result.settings,
+              });
+            })
+            .catch((err) => {
+              safeResponse({ success: false, error: err.message });
+            });
+        } else if (request.action === "RESTORE_BACKUP") {
+          self.yttDB
+            .getBackupById(request.id)
+            .then((backup) => {
+              if (backup) {
+                return handleImportBackup(backup.data);
+              }
+              throw new Error("Backup not found");
+            })
+            .then((result) => {
+              safeResponse({
+                success: result.success,
+                settings: result.settings,
+              });
+            })
+            .catch((err) => {
+              safeResponse({ success: false, error: err.message });
+            });
+        } else if (request.action === "DELETE_ALL_BACKUPS") {
+          self.yttDB
+            .clearAllBackups()
+            .then(() => {
+              safeResponse({ success: true });
+            })
+            .catch((err) => {
+              safeResponse({ success: false, error: err.message });
+            });
+        } else if (request.action === "GET_DISLIKE_COUNT") {
+          fetchDislikeFromAPI(request.videoId)
+            .then((data) => safeResponse(data))
+            .catch((err) => {
+              console.error("BG: Dislike fetch error:", err);
+              safeResponse(null);
+            });
+        } else {
+          // Fallback for unknown actions
+          safeResponse({ error: "Unknown action: " + request.action });
+        }
+      } catch (err) {
+        console.error("BG: Async message handling error:", err);
+        safeResponse({ error: err.message });
+      }
+    })
+    .catch((err) => {
+      console.error("BG: loadPromise rejection:", err);
+      safeResponse({ error: "State load failed" });
+    });
+
   return true; // Keep message channel open for asynchronous response
 });
 
@@ -287,11 +384,11 @@ function handleWatchTimeReport(data) {
     if (delta > 0) {
       // 1. Individual video accuracy: always increment
       videoEntry.watchedDuration += delta;
-      
+
       // 2. Aggregate Watch Time: always increment (5 tabs = 5s per second)
       todayData.watchTime += delta;
     }
-    
+
     // Track if this specific video instance is currently playing
     const wasPlaying = !!videoEntry.isPlaying;
     videoEntry.isPlaying = !!data.isPlaying;
@@ -321,10 +418,10 @@ function handleWatchTimeReport(data) {
   // This handles closed tabs or videos that were paused without a final report.
   const now = Date.now();
   if (todayData && todayData.videos) {
-    todayData.videos.forEach(v => {
-        if (v.isPlaying && (now - (v.lastUpdated || 0) > 3000)) {
-            v.isPlaying = false;
-        }
+    todayData.videos.forEach((v) => {
+      if (v.isPlaying && now - (v.lastUpdated || 0) > 3000) {
+        v.isPlaying = false;
+      }
     });
   }
 
@@ -332,7 +429,7 @@ function handleWatchTimeReport(data) {
   const timeSinceLastActiveUpdate = now - lastGlobalActiveUpdateTime;
 
   // STRICT LINEAR TIME: Only add time if 1s+ has passed globally.
-  // We add 'timeSinceLastActiveUpdate' but cap it to 2s to avoid massive jumps 
+  // We add 'timeSinceLastActiveUpdate' but cap it to 2s to avoid massive jumps
   // (e.g. if the computer sleeps or browser suspends background scripts).
   if (timeSinceLastActiveUpdate >= 950) {
     const linearDelta = Math.min(timeSinceLastActiveUpdate, 2000) / 1000;
@@ -355,15 +452,20 @@ function broadcastHistoryToTabs() {
     allTabs.forEach((tab) => {
       // Don't send if we don't have permission for this tab
       if (!tab.url || !tab.url.includes("youtube.com")) return;
-      
+
       try {
-        chrome.tabs.sendMessage(tab.id, { 
-          action: "HISTORY_UPDATE", 
-          allHistory: allHistory 
-        }, () => {
-          // Ignore errors (tab might be closed or not loaded yet)
-          if (chrome.runtime.lastError) {}
-        });
+        chrome.tabs.sendMessage(
+          tab.id,
+          {
+            action: "HISTORY_UPDATE",
+            allHistory: allHistory,
+          },
+          () => {
+            // Ignore errors (tab might be closed or not loaded yet)
+            if (chrome.runtime.lastError) {
+            }
+          },
+        );
       } catch (e) {}
     });
   });
@@ -374,7 +476,7 @@ function broadcastHistoryToTabs() {
  */
 function throttledSaveHistory() {
   const now = Date.now();
-  
+
   // If we haven't written in 5 seconds, do it now
   if (now - lastStorageWriteTime > 5000) {
     if (pendingSaveTimeout) {
@@ -384,10 +486,13 @@ function throttledSaveHistory() {
     saveHistoryNow();
   } else if (!pendingSaveTimeout) {
     // Schedule a save if one isn't already pending
-    pendingSaveTimeout = setTimeout(() => {
-      pendingSaveTimeout = null;
-      saveHistoryNow();
-    }, 5000 - (now - lastStorageWriteTime));
+    pendingSaveTimeout = setTimeout(
+      () => {
+        pendingSaveTimeout = null;
+        saveHistoryNow();
+      },
+      5000 - (now - lastStorageWriteTime),
+    );
   }
 }
 
@@ -416,6 +521,9 @@ function handleSettingsUpdate(data) {
     // Trigger immediate cleanup when setting changes
     allHistory = cleanupOldHistory(allHistory, retentionSettings.duration);
     storage.local.set({ ytt_history: allHistory });
+  } else if (data.type === "opacity") {
+    opacitySettings = data.settings;
+    storage.local.set({ ytt_opacity_settings: opacitySettings });
   }
 }
 
@@ -460,33 +568,78 @@ async function fetchZenQuote() {
 }
 
 async function fetchDislikeFromAPI(videoId) {
-    console.log(`BG: Fetching dislike count for ${videoId}`);
+  console.log(`BG: Fetching dislike count for ${videoId}`);
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-        const response = await fetch(
-            `https://returnyoutubedislikeapi.com/votes?videoId=${videoId}`
-        );
-        if (!response.ok) {
-            console.error(`BG: API error: ${response.status}`);
-            return null;
-        }
+      const response = await fetch(
+        `https://returnyoutubedislikeapi.com/votes?videoId=${videoId}`,
+      );
+      if (response.ok) {
         const data = await response.json();
         return data;
+      }
+      // Retry on server errors (5xx), give up on client errors (4xx)
+      if (response.status >= 500 && attempt < maxRetries - 1) {
+        const delay = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s
+        console.warn(
+          `BG: API returned ${response.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      console.warn(`BG: API error: ${response.status} for ${videoId}`);
+      return null;
     } catch (e) {
-        console.error("BG: Fetch failed:", e);
-        return null;
+      if (attempt < maxRetries - 1) {
+        const delay = Math.pow(2, attempt) * 500;
+        console.warn(
+          `BG: Fetch failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries}):`,
+          e.message,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      console.warn("BG: Dislike fetch failed after retries:", e.message);
+      return null;
     }
+  }
+  return null;
 }
 
 // === Backup Logic ===
 
 async function createBackup() {
+  // Just-In-Time fetch from storage to avoid race conditions with recent UI changes
+  const storageData = await new Promise((resolve) => {
+    storage.local.get(
+      [
+        "ytt_shorts_settings",
+        "ytt_break_settings",
+        "ytt_backup_settings",
+        "ytt_retention_settings",
+        "ytt_dislike_settings",
+        "ytt_opacity_settings",
+        "ytt_smart_fullscreen_settings",
+        "ytt_keybind_settings",
+      ],
+      (res) => resolve(res),
+    );
+  });
+
   const data = {
-    allHistory,
-    shortsBlockerSettings,
-    breakSettings,
-    backupSettings,
-    retentionSettings,
-    dislikeCountSettings,
+    allHistory, // Background is the source of truth for current session history
+    shortsBlockerSettings:
+      storageData.ytt_shorts_settings || shortsBlockerSettings,
+    breakSettings: storageData.ytt_break_settings || breakSettings,
+    backupSettings: storageData.ytt_backup_settings || backupSettings,
+    retentionSettings: storageData.ytt_retention_settings || retentionSettings,
+    dislikeCountSettings:
+      storageData.ytt_dislike_settings || dislikeCountSettings,
+    opacitySettings: storageData.ytt_opacity_settings || opacitySettings,
+    smartFullscreenSettings:
+      storageData.ytt_smart_fullscreen_settings || smartFullscreenSettings,
+    keybindSettings: storageData.ytt_keybind_settings || keybindSettings,
   };
   try {
     await self.yttDB.addBackup(data);
@@ -507,20 +660,31 @@ async function handleImportBackup(data) {
   try {
     // Update memory state - Ensure every setting is updated or reset to default
     allHistory = data.allHistory || data.ytt_history || {};
-    shortsBlockerSettings = data.shortsBlockerSettings || data.ytt_shorts_settings || { enabled: true };
-    breakSettings = data.breakSettings || data.ytt_break_settings || {
-      enabled: true,
-      intervalMinutes: 15,
-      workUrl: "https://www.google.com",
-    };
-    backupSettings = data.backupSettings || data.ytt_backup_settings || {
-      enabled: true,
-      intervalHours: 24,
-      backupOnClose: true,
-      maxBackups: 10,
-    };
-    retentionSettings = data.retentionSettings || data.ytt_retention_settings || { duration: 7 };
-    dislikeCountSettings = data.dislikeCountSettings || data.ytt_dislike_settings || { enabled: true };
+    shortsBlockerSettings = data.shortsBlockerSettings ||
+      data.ytt_shorts_settings || { enabled: true };
+    breakSettings = data.breakSettings ||
+      data.ytt_break_settings || {
+        enabled: true,
+        intervalMinutes: 15,
+        workUrl: "https://www.google.com",
+      };
+    backupSettings = data.backupSettings ||
+      data.ytt_backup_settings || {
+        enabled: true,
+        intervalHours: 24,
+        backupOnClose: true,
+        maxBackups: 10,
+      };
+    retentionSettings = data.retentionSettings ||
+      data.ytt_retention_settings || { duration: 7 };
+    dislikeCountSettings = data.dislikeCountSettings ||
+      data.ytt_dislike_settings || { enabled: true };
+    opacitySettings = data.opacitySettings ||
+      data.ytt_opacity_settings || { enabled: false, value: 0.5 };
+    smartFullscreenSettings = data.smartFullscreenSettings ||
+      data.ytt_smart_fullscreen_settings || { enabled: true };
+    keybindSettings = data.keybindSettings ||
+      data.ytt_keybind_settings || keybindSettings;
 
     // Save to storage
     const saveObj = {
@@ -530,6 +694,9 @@ async function handleImportBackup(data) {
       ytt_backup_settings: backupSettings,
       ytt_retention_settings: retentionSettings,
       ytt_dislike_settings: dislikeCountSettings,
+      ytt_opacity_settings: opacitySettings,
+      ytt_smart_fullscreen_settings: smartFullscreenSettings,
+      ytt_keybind_settings: keybindSettings,
     };
 
     await new Promise((resolve, reject) => {
@@ -545,15 +712,18 @@ async function handleImportBackup(data) {
     // Create an automatic backup of the newly imported state for safety
     await createBackup();
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       settings: {
         ytt_shorts_settings: shortsBlockerSettings,
         ytt_break_settings: breakSettings,
         ytt_backup_settings: backupSettings,
         ytt_retention_settings: retentionSettings,
-        ytt_dislike_settings: dislikeCountSettings
-      }
+        ytt_dislike_settings: dislikeCountSettings,
+        ytt_opacity_settings: opacitySettings,
+        ytt_smart_fullscreen_settings: smartFullscreenSettings,
+        ytt_keybind_settings: keybindSettings,
+      },
     };
   } catch (err) {
     console.error("YTT: Import backup failed:", err);
@@ -593,5 +763,43 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     if (youtubeTabs.size === 0 && backupSettings.backupOnClose) {
       createBackup();
     }
+  }
+});
+// === Command Shortcuts Handler ===
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "toggle-pip") {
+    // Find the relevant YouTube tab to toggle
+    chrome.tabs.query({ url: "*://*.youtube.com/*" }, (allTabs) => {
+      if (allTabs.length === 0) return;
+
+      // PRIORITY 1: Tab that is currently audible (browser-level check)
+      const audibleTab = allTabs.find((t) => t.audible);
+      if (audibleTab) {
+        chrome.tabs.sendMessage(audibleTab.id, { action: "TOGGLE_PIP" });
+        return;
+      }
+
+      // PRIORITY 2: Tab that most recently reported watching activity
+      const playingTabIds = Object.keys(activePlayingTabs).map(Number);
+      if (playingTabIds.length > 0) {
+        const targetTabId = playingTabIds.sort(
+          (a, b) => activePlayingTabs[b].time - activePlayingTabs[a].time,
+        )[0];
+        if (targetTabId) {
+          chrome.tabs.sendMessage(targetTabId, { action: "TOGGLE_PIP" });
+          return;
+        }
+      }
+
+      // PRIORITY 3: Active YouTube tab
+      const activeTab = allTabs.find((t) => t.active);
+      if (activeTab) {
+        chrome.tabs.sendMessage(activeTab.id, { action: "TOGGLE_PIP" });
+        return;
+      }
+
+      // PRIORITY 4: First YouTube tab found
+      chrome.tabs.sendMessage(allTabs[0].id, { action: "TOGGLE_PIP" });
+    });
   }
 });

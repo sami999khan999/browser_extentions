@@ -1,14 +1,17 @@
 // === Bootstrap: Initial calls, intervals, observers, event listeners ===
 
 (async () => {
-    // Wait for state to load from storage
+    // Wait for full state to load from storage
     await initState();
 
     // Initial Run
     applyShortsBlockerState();
     applyDislikeCountState();
+    applyOpacityState();
     injectStatsUI();
     setupFullscreenAutoHide();
+    if (typeof setupSmartFullscreen === 'function') setupSmartFullscreen();
+    if (typeof window.initShortcuts === 'function') window.initShortcuts();
 
     // Intervals
     const trackingInterval = setInterval(() => {
@@ -42,6 +45,7 @@
 
         // Ensure UI is re-injected if YouTube's SPA wipes it
         injectStatsUI();
+        if (typeof applyFloatingPlayerState === 'function') applyFloatingPlayerState();
     });
 
     observer.observe(document.documentElement, {
@@ -60,12 +64,16 @@
     window.addEventListener('yt-page-data-updated', () => {
         applyShortsBlockerState();
         applyDislikeCountState();
+        applyOpacityState();
         injectStatsUI();
+        if (typeof applyFloatingPlayerState === 'function') applyFloatingPlayerState();
     });
     window.addEventListener('yt-navigate-finish', () => {
         applyShortsBlockerState();
         applyDislikeCountState();
+        applyOpacityState();
         injectStatsUI();
+        if (typeof applyFloatingPlayerState === 'function') applyFloatingPlayerState();
     });
     window.addEventListener('popstate', () => {
         if (shortsBlockerSettings.enabled) blockShorts();

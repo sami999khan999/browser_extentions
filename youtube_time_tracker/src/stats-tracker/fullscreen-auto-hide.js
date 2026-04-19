@@ -1,19 +1,38 @@
 // === Fullscreen Auto-hide: Hide toggle button during fullscreen inactivity ===
 
 let autoHideTimeout = null;
-const AUTO_HIDE_DELAY = 3000; // 5 seconds
+const AUTO_HIDE_DELAY = 3000; // 3 seconds
 
 function setupFullscreenAutoHide() {
-    // Listen for fullscreen changes
+    // Listen for native browser fullscreen changes
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    // Watch for pseudo-fullscreen class toggles on the root element
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                handleFullscreenChange();
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
 
     // Listen for mouse movement to reset timer
     document.addEventListener('mousemove', resetAutoHideTimer);
 }
 
+/**
+ * Checks if the page is in native fullscreen OR our custom pseudo-fullscreen mode
+ */
+function isAnyFullscreenActive() {
+    const isNative = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const isPseudo = document.documentElement.classList.contains('ytt-pseudo-active');
+    return isNative || isPseudo;
+}
+
 function handleFullscreenChange() {
-    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const isFullscreen = isAnyFullscreenActive();
     const btn = document.getElementById('stats-toggle-btn');
     
     if (!btn) return;
@@ -28,8 +47,7 @@ function handleFullscreenChange() {
 }
 
 function resetAutoHideTimer() {
-    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    if (!isFullscreen) return;
+    if (!isAnyFullscreenActive()) return;
 
     const btn = document.getElementById('stats-toggle-btn');
     if (btn) {

@@ -21,7 +21,8 @@ function getSidebarHTML() {
         </div>
 
         <div id="stats-header-filters" class="stats-subheader collapsed" style="display: none;">
-            <div class="filter-toolbar">
+            <!-- History Filters (default) -->
+            <div class="filter-toolbar" id="history-header-content">
                 <div class="date-nav-group">
                     <button id="date-prev" class="nav-arrow-btn" title="Previous Day">
                         ${icons.prev}
@@ -54,6 +55,8 @@ function getSidebarHTML() {
                     ${icons.calendar}
                 </button>
             </div>
+
+            <!-- (Keybinds uses its own header row in the view body) -->
         </div>
         <div id="calendar-popover" class="calendar-popover" style="display: none;"></div>
         <div id="history-filter-toggle" class="filter-toggle-strip" style="display: none;">
@@ -248,23 +251,92 @@ function getSidebarHTML() {
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.expand || ""}</span>
+                                    <span class="settings-item-label">Floating Video</span>
+                                </div>
+                                <span class="settings-item-desc">Enable a floating, resizable player window (Control bar button)</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="smart-fullscreen-toggle" ${smartFullscreenSettings.enabled ? "checked" : ""}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item opacity-toggle-item">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.eye || ""}</span>
+                                    <span class="settings-item-label">Dim YouTube Base</span>
+                                </div>
+                                <span class="settings-item-desc">Reduce YouTube content opacity (Shortcut available)</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="opacity-enabled-toggle" ${opacitySettings.enabled ? "checked" : ""}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item vertical opacity-slider-item" id="opacity-slider-container" style="${opacitySettings.enabled ? "" : "display: none;"}">
+                            <div class="settings-item-info">
+                                <span class="settings-item-label">Opacity Level</span>
+                                <span class="settings-item-desc">Adjust how transparent YouTube becomes (0.0 - 1.0)</span>
+                            </div>
+                            <div class="slider-input-wrapper">
+                                <input type="range" id="opacity-value-slider" min="0" max="1" step="0.01" value="${opacitySettings.value}">
+                                <span id="opacity-percentage-label">${Math.round(opacitySettings.value * 100)}%</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="settings-section">
                     <h4 class="section-title">Configuration</h4>
                     <div class="settings-card">
+                        <div class="settings-item clickable" id="nav-keybinds">
+                            <div class="settings-item-info">
+                                <span class="settings-item-label">Hotkeys & Shortcuts</span>
+                                <span class="settings-item-desc">Customize keyboard shortcuts for all features</span>
+                            </div>
+                            <span class="chevron-right">${icons.next}</span>
+                        </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">
                                 <span class="settings-item-label">Reminder Interval</span>
-                                <span class="settings-item-desc">Minutes of watching before a break (1-120)</span>
+                                <span class="settings-item-desc">Minutes or Seconds of watching before a break (1-120)</span>
                             </div>
-                            <div class="interval-input-wrapper">
-                                <button class="interval-btn minus" id="interval-minus">−</button>
-                                <input type="number" id="interval-value" class="interval-value" value="${breakSettings.intervalMinutes}" min="1" max="120">
-                                <button class="interval-btn plus" id="interval-plus">+</button>
-                                <span class="interval-unit">min</span>
-                            </div>
+                             <div class="interval-input-wrapper">
+                                 <button class="interval-btn minus" id="interval-minus">−</button>
+                                 <input type="number" id="interval-value" class="interval-value" value="${breakSettings.intervalValue}" min="1" max="3600">
+                                 <button class="interval-btn plus" id="interval-plus">+</button>
+                                 <div class="custom-dropdown tiny" id="interval-unit-dropdown" data-value="${
+                                   breakSettings.intervalUnit
+                                 }">
+                                    <div class="dropdown-trigger">
+                                        <span>${
+                                          breakSettings.intervalUnit ===
+                                          "minutes"
+                                            ? "min"
+                                            : "sec"
+                                        }</span>
+                                        <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                    </div>
+                                    <div class="dropdown-menu">
+                                        <div class="dropdown-item ${
+                                          breakSettings.intervalUnit ===
+                                          "minutes"
+                                            ? "active"
+                                            : ""
+                                        }" data-value="minutes">min</div>
+                                        <div class="dropdown-item ${
+                                          breakSettings.intervalUnit ===
+                                          "seconds"
+                                            ? "active"
+                                            : ""
+                                        }" data-value="seconds">sec</div>
+                                    </div>
+                                 </div>
+                             </div>
                         </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">
@@ -274,6 +346,7 @@ function getSidebarHTML() {
                             <input type="text" id="setting-work-url" class="settings-text-input" value="${breakSettings.workUrl}" placeholder="https://google.com">
                         </div>
                     </div>
+
                 </div>
 
                 <div class="settings-section">
@@ -426,6 +499,18 @@ function getSidebarHTML() {
                         <ul id="backup-history-list" class="backup-list">
                             <li class="loading-placeholder">Loading backups...</li>
                         </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="keybinds-view" style="display: none;">
+                <div class="settings-section">
+                    <div class="keybinds-top-bar">
+                        <span class="keybinds-remap-hint">Click any key to remap &nbsp;&bull;&nbsp; Esc to cancel</span>
+                        <button id="reset-keybinds" class="subheader-action-btn">Reset Defaults</button>
+                    </div>
+                    <div id="keybinds-list-container">
+                        <!-- Categorized settings cards will be injected here -->
                     </div>
                 </div>
             </div>

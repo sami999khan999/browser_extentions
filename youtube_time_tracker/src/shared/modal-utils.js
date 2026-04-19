@@ -1,4 +1,92 @@
 /**
+ * Global tracker for elements made inert by current modal
+ */
+let isolatedElements = [];
+let activeModalKeyHandler = null;
+
+/**
+ * isolateModal - Makes all background elements inert except the modal itself.
+ * 
+ * @param {HTMLElement} modalOverlay - The modal overlay to keep active
+ */
+function isolateModal(modalOverlay) {
+    isolatedElements = [];
+    const siblings = Array.from(document.body.children);
+    siblings.forEach(sibling => {
+        if (sibling !== modalOverlay && !sibling.hasAttribute('inert')) {
+            sibling.setAttribute('inert', '');
+            sibling.setAttribute('aria-hidden', 'true');
+            isolatedElements.push(sibling);
+        }
+    });
+
+    // Block all keyboard events from reaching YouTube background
+    if (activeModalKeyHandler) {
+        removeModalListeners();
+    }
+
+    activeModalKeyHandler = (e) => {
+        // Allow keys through when recording a keybind remap
+        if (typeof isRecording !== 'undefined' && isRecording) return;
+
+        const isInside = modalOverlay.contains(e.target);
+        const isTab = e.key === 'Tab';
+        const isEscape = e.key === 'Escape';
+        const isActionOnButton = (e.key === ' ' || e.key === 'Enter') && isInside && e.target.tagName === 'BUTTON';
+
+        // We only allow:
+        // 1. Tab/Escape (standard modal navigation)
+        // 2. Any key if the focus is ALREADY inside the modal and it's not a forbidden global shortcut
+        // But to be safest, we block everything and only whitelist what's needed.
+        
+        if (isTab || isEscape || isActionOnButton) {
+            return; // Normal modal behavior
+        }
+
+        // Block everything else
+        e.stopImmediatePropagation();
+        e.preventDefault();
+    };
+
+    addModalListeners();
+}
+
+/**
+ * Global helper to add/remove listeners across multiple levels
+ */
+function addModalListeners() {
+    ['keydown', 'keyup', 'keypress'].forEach(type => {
+        window.addEventListener(type, activeModalKeyHandler, true);
+        document.addEventListener(type, activeModalKeyHandler, true);
+    });
+}
+
+function removeModalListeners() {
+    ['keydown', 'keyup', 'keypress'].forEach(type => {
+        window.removeEventListener(type, activeModalKeyHandler, true);
+        document.removeEventListener(type, activeModalKeyHandler, true);
+    });
+}
+
+/**
+ * restoreIsolation - Removes inert and aria-hidden from formerly isolated elements.
+ */
+function restoreIsolation() {
+    isolatedElements.forEach(el => {
+        if (el) {
+            el.removeAttribute('inert');
+            el.removeAttribute('aria-hidden');
+        }
+    });
+    isolatedElements = [];
+
+    if (activeModalKeyHandler) {
+        removeModalListeners();
+        activeModalKeyHandler = null;
+    }
+}
+
+/**
  * showConfirmModal - Reusable accessible confirmation dialog
  * 
  * @param {Object} options 
@@ -44,11 +132,15 @@ function showConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
         overlay.classList.remove('visible');
         document.body.style.overflow = '';
         document.body.style.userSelect = '';
+        restoreIsolation();
         setTimeout(() => overlay.remove(), 300);
     };
 
     // Animation
-    requestAnimationFrame(() => overlay.classList.add('visible'));
+    requestAnimationFrame(() => {
+        overlay.classList.add('visible');
+        isolateModal(overlay);
+    });
     setTimeout(() => cancelBtn.focus(), 100);
 
     // Events
@@ -126,10 +218,14 @@ function showAlertModal({ title, message, buttonText = 'Got it', icon = '⚠️'
     const dismiss = () => {
         overlay.classList.remove('visible');
         document.body.style.overflow = '';
+        restoreIsolation();
         setTimeout(() => overlay.remove(), 300);
     };
 
-    requestAnimationFrame(() => overlay.classList.add('visible'));
+    requestAnimationFrame(() => {
+        overlay.classList.add('visible');
+        isolateModal(overlay);
+    });
     setTimeout(() => okBtn.focus(), 100);
 
     okBtn.onclick = (e) => {
@@ -294,11 +390,15 @@ function showMultiTabModal(otherTabId, onKeep) {
     const dismiss = () => {
         overlay.classList.remove('visible');
         document.body.style.overflow = originalOverflow;
+        restoreIsolation();
         setTimeout(() => overlay.remove(), 400);
     };
 
     // Animation
-    requestAnimationFrame(() => overlay.classList.add('visible'));
+    requestAnimationFrame(() => {
+        overlay.classList.add('visible');
+        isolateModal(overlay);
+    });
     setTimeout(() => closeOtherBtn.focus(), 100);
 
     keepBtn.onclick = (e) => {

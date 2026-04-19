@@ -12,14 +12,16 @@
   "background": {
     "service_worker": "dist/background.js"
   },
-  "host_permissions": ["*://*.youtube.com/*", "https://zenquotes.io/*", "https://returnyoutubedislikeapi.com/*"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "https://zenquotes.io/*",
+    "https://returnyoutubedislikeapi.com/*"
+  ],
 
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*"],
-      "css": [
-        "dist/content.css"
-      ],
+      "css": ["dist/content.css"],
       "js": ["dist/content.js"],
       "run_at": "document_start"
     }
@@ -31,6 +33,16 @@
       "32": "icons/icon128.jpg",
       "48": "icons/icon128.jpg",
       "128": "icons/icon128.jpg"
+    }
+  },
+  "commands": {
+    "toggle-pip": {
+      "suggested_key": {
+        "default": "Alt+F",
+        "linux": "Ctrl+Shift+F"
+      },
+      "description": "Toggle Floating Modal (PiP)",
+      "global": true
     }
   }
 }

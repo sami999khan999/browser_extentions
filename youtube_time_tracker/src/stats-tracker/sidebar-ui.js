@@ -184,6 +184,8 @@ function setupSidebarLogic(btn) {
   // Sidebar
   const sidebar = document.createElement("div");
   sidebar.id = "stats-sidebar";
+  sidebar.setAttribute("tabindex", "-1"); // Allow focus for keyboard control
+  sidebar.style.outline = "none"; // Hide focus ring
 
   // Load and Apply Persisted Width from storage
   safeStorageGet("ytt_sidebar_width", (data) => {

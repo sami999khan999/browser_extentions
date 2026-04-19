@@ -16,7 +16,8 @@ let allHistory = {};
 let shortsBlockerSettings = { enabled: true };
 let breakSettings = {
   enabled: true,
-  intervalMinutes: 15,
+  intervalValue: 15,
+  intervalUnit: "minutes",
   workUrl: "https://www.google.com",
 };
 let dislikeCountSettings = { enabled: true };
@@ -28,6 +29,27 @@ let backupSettings = {
 };
 let retentionSettings = {
   duration: 7, // Default 7 days
+};
+let smartFullscreenSettings = {
+  enabled: true,
+};
+let keybindSettings = {
+  toggleSidebar: "Alt+S",
+  toggleFloating: "Alt+F",
+  toggleDislike: "Alt+D",
+  toggleShorts: "Alt+B",
+  navHistory: "Alt+Q",
+  navAnalytics: "Alt+W",
+  navChannels: "Alt+E",
+  navBackup: "Alt+R",
+  navSettings: "Alt+T",
+  navShortcuts: "Alt+Y",
+  manualBackup: "Alt+I",
+  toggleOpacity: "Alt+U"
+};
+let opacitySettings = {
+  enabled: false,
+  value: 0.5,
 };
 
 let selectedDayFilter = "today"; // 'today', 'yesterday', 'all', or 'YYYY-MM-DD'
@@ -63,6 +85,9 @@ async function initState() {
         "ytt_dislike_settings",
         "ytt_backup_settings",
         "ytt_retention_settings",
+        "ytt_smart_fullscreen_settings",
+        "ytt_keybind_settings",
+        "ytt_opacity_settings",
         "ytt_migrated",
       ],
       (data) => {
@@ -106,7 +131,17 @@ async function initState() {
 
         // Apply settings
         if (shortsSettings) shortsBlockerSettings = shortsSettings;
-        if (bSettings) breakSettings = bSettings;
+        if (bSettings) {
+          // Handle migration from intervalMinutes
+          if (
+            bSettings.intervalMinutes !== undefined &&
+            bSettings.intervalValue === undefined
+          ) {
+            bSettings.intervalValue = bSettings.intervalMinutes;
+            bSettings.intervalUnit = "minutes";
+          }
+          breakSettings = { ...breakSettings, ...bSettings };
+        }
         if (data.ytt_dislike_settings) {
           dislikeCountSettings.enabled =
             data.ytt_dislike_settings.enabled ?? true;
@@ -118,6 +153,24 @@ async function initState() {
           retentionSettings = {
             ...retentionSettings,
             ...data.ytt_retention_settings,
+          };
+        }
+        if (data.ytt_smart_fullscreen_settings) {
+          smartFullscreenSettings = {
+            ...smartFullscreenSettings,
+            ...data.ytt_smart_fullscreen_settings,
+          };
+        }
+        if (data.ytt_keybind_settings) {
+          keybindSettings = {
+            ...keybindSettings,
+            ...data.ytt_keybind_settings,
+          };
+        }
+        if (data.ytt_opacity_settings) {
+          opacitySettings = {
+            ...opacitySettings,
+            ...data.ytt_opacity_settings,
           };
         }
 
@@ -142,7 +195,8 @@ function safeSendMessage(message, callback) {
           if (
             errorMsg.includes("context invalidated") ||
             errorMsg.includes("message port closed") ||
-            errorMsg.includes("Receiving end does not exist")
+            errorMsg.includes("Receiving end does not exist") ||
+            errorMsg.includes("asynchronous response")
           ) {
             return;
           }
@@ -237,10 +291,10 @@ function deleteHistoryVideo(uid) {
 function clearAllData() {
   safeSendMessage({ action: "CLEAR_HISTORY" }, () => {
     // Reset in-memory settings (history will be updated via storage listener)
-    shortsBlockerSettings = { enabled: true };
     breakSettings = {
       enabled: true,
-      intervalMinutes: 15,
+      intervalValue: 15,
+      intervalUnit: "minutes",
       workUrl: "https://www.google.com",
     };
 
@@ -284,6 +338,17 @@ function saveBackupSettings() {
   });
 }
 
+function saveOpacitySettings() {
+  safeSendMessage({
+    action: "SAVE_SETTINGS",
+    type: "opacity",
+    settings: opacitySettings,
+  });
+  try {
+    localStorage.setItem("ytt_opacity_fast_path", JSON.stringify(opacitySettings));
+  } catch (e) {}
+}
+
 function saveRetentionSettings() {
   safeSendMessage({
     action: "SAVE_SETTINGS",
@@ -321,11 +386,14 @@ storage.onChanged.addListener((changes, area) => {
       if (changes.ytt_break_settings) {
         const newValue = changes.ytt_break_settings.newValue || {
           enabled: true,
-          intervalMinutes: 15,
+          intervalValue: 15,
+          intervalUnit: "minutes",
           workUrl: "https://www.google.com",
         };
         breakSettings.enabled = newValue.enabled;
-        breakSettings.intervalMinutes = newValue.intervalMinutes;
+        breakSettings.intervalValue =
+          newValue.intervalValue ?? newValue.intervalMinutes ?? 15;
+        breakSettings.intervalUnit = newValue.intervalUnit || "minutes";
         breakSettings.workUrl = newValue.workUrl;
         needsUIRefresh = true;
       }
@@ -341,11 +409,19 @@ storage.onChanged.addListener((changes, area) => {
         };
         needsUIRefresh = true;
       }
-      if (changes.ytt_retention_settings) {
-        retentionSettings = {
-          ...{ duration: 7 },
-          ...(changes.ytt_retention_settings.newValue || {}),
+      if (changes.ytt_smart_fullscreen_settings) {
+        smartFullscreenSettings = {
+          ...{ enabled: false },
+          ...(changes.ytt_smart_fullscreen_settings.newValue || {}),
         };
+        needsUIRefresh = true;
+      }
+      if (changes.ytt_opacity_settings) {
+        opacitySettings = {
+          ...{ enabled: false, value: 0.5 },
+          ...(changes.ytt_opacity_settings.newValue || {}),
+        };
+        applyOpacityState();
         needsUIRefresh = true;
       }
 
@@ -361,3 +437,58 @@ storage.onChanged.addListener((changes, area) => {
     }
   }
 });
+
+function saveRetentionSettings() {
+  safeStorageSet({ ytt_retention_settings: retentionSettings });
+}
+
+function saveSmartFullscreenSettings() {
+  safeStorageSet({ ytt_smart_fullscreen_settings: smartFullscreenSettings });
+}
+
+function applyOpacityState() {
+  const OPACITY_STYLE_ID = "ytt-opacity-style-tag";
+  let styleEl = document.getElementById(OPACITY_STYLE_ID);
+
+  if (!opacitySettings.enabled) {
+    if (styleEl) styleEl.remove();
+    // Rely on the removal of the style tag to revert background color
+    return;
+  }
+
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = OPACITY_STYLE_ID;
+    const target = document.head || document.documentElement;
+    target.appendChild(styleEl);
+  }
+
+  const css = `
+    ytd-app, #content, #page-manager {
+      opacity: ${opacitySettings.value} !important;
+      transition: opacity 0.3s ease !important;
+    }
+    body, ytd-app {
+      background-color: #000 !important;
+    }
+    #stats-sidebar, #stats-toggle-btn, .stats-tooltip, .confirm-modal-overlay {
+      opacity: 1 !important;
+    }
+  `;
+
+  if (styleEl.textContent !== css) {
+    styleEl.textContent = css;
+  }
+}
+
+// === ZERO-LATENCY FAST PATH: Apply opacity instantly on load ===
+try {
+  const fastPath = localStorage.getItem("ytt_opacity_fast_path");
+  if (fastPath) {
+    const cached = JSON.parse(fastPath);
+    if (cached && cached.enabled) {
+      opacitySettings = cached;
+      applyOpacityState();
+    }
+  }
+} catch (e) {}

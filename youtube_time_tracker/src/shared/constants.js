@@ -12,8 +12,30 @@ ytd-mini-guide-entry-renderer:has(a[title="Shorts"]) {
 /* Hiding Home Feed Shorts Sections */
 ytd-rich-shelf-renderer[is-shorts],
 ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
-ytd-reel-shelf-renderer {
-    display: none !important;
+#ytt-floating-btn:hover {
+    color: #fff !important;
+}
+
+/* Custom Player Tooltip */
+.ytt-player-tooltip {
+    position: fixed;
+    background: rgba(28, 28, 28, 0.9);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 2147483647;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+.ytt-player-tooltip.visible {
+    opacity: 1;
 }
 /* Hiding Shorts in Search Results */
 ytd-reel-shelf-renderer,
@@ -82,4 +104,7 @@ const icons = {
   calendar: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
   chevron_down: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`,
   chevron_up: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>`,
+  expand: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>`,
+  pip: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M13 11l7 7"></path><path d="M20 11v7h-7"></path></svg>`,
+  eye: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
 };

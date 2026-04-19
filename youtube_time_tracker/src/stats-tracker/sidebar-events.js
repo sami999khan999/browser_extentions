@@ -5,6 +5,7 @@
  */
 let viewHistory = ["history"]; // Navigation stack
 let selectedChannelForVideos = null; // Currently viewed channel's videos
+let isFilterCollapsed = true; // Track requested manual state of the date picker/filters slider
 
 /**
  * Synchronizes all UI controls (toggles, inputs, dropdowns) with the current
@@ -30,9 +31,28 @@ function syncSettingsUI() {
   if (backupOnCloseToggle)
     backupOnCloseToggle.checked = backupSettings.backupOnClose;
 
+  const smartFullscreenToggle = document.getElementById("smart-fullscreen-toggle");
+  if (smartFullscreenToggle)
+    smartFullscreenToggle.checked = smartFullscreenSettings.enabled;
+
+  const opacityToggle = document.getElementById("opacity-enabled-toggle");
+  if (opacityToggle) opacityToggle.checked = opacitySettings.enabled;
+
+  const opacitySlider = document.getElementById("opacity-value-slider");
+  if (opacitySlider) {
+    opacitySlider.value = opacitySettings.value;
+    updateSliderProgress(opacitySlider);
+  }
+
+  const opacityLabel = document.getElementById("opacity-percentage-label");
+  if (opacityLabel) opacityLabel.textContent = Math.round(opacitySettings.value * 100) + "%";
+
+  const opacitySliderContainer = document.getElementById("opacity-slider-container");
+  if (opacitySliderContainer) opacitySliderContainer.style.display = opacitySettings.enabled ? "flex" : "none";
+
   // 2. Numeric & Text Inputs
   const intervalValue = document.getElementById("interval-value");
-  if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
+  if (intervalValue) intervalValue.value = breakSettings.intervalValue;
 
   const workUrlInput = document.getElementById("setting-work-url");
   if (workUrlInput) workUrlInput.value = breakSettings.workUrl;
@@ -78,6 +98,11 @@ function syncSettingsUI() {
   });
 
   syncDropdown("history-period-dropdown", selectedDayFilter, {});
+
+  syncDropdown("interval-unit-dropdown", breakSettings.intervalUnit, {
+    minutes: "min",
+    seconds: "sec",
+  });
 
   // 4. Special internal UI syncs
   if (typeof syncHistoryPresets === "function") syncHistoryPresets();
@@ -186,8 +211,7 @@ const syncHistoryPresets = () => {
 };
 
 function switchView(viewName) {
-  // Push to history stack (avoid duplicates at top)
-  if (viewHistory[viewHistory.length - 1] !== viewName) {
+  if (viewName !== activeView) {
     viewHistory.push(viewName);
     // Keep stack manageable
     if (viewHistory.length > 20) viewHistory.shift();
@@ -222,6 +246,28 @@ function _switchViewInternal(viewName) {
   if (cvView)
     cvView.style.display = viewName === "channel-videos" ? "block" : "none";
 
+  const kbView = document.getElementById("keybinds-view");
+  const historyContent = document.getElementById("history-header-content");
+
+  if (kbView) {
+    kbView.style.display = viewName === "keybinds" ? "block" : "none";
+    if (viewName === "keybinds" || viewName === "history" || viewName === "analytics") {
+      if (viewName === "keybinds" && typeof renderKeybinds === "function") renderKeybinds();
+      if (historyContent) historyContent.style.display = "flex";
+      if (hFilters) {
+        hFilters.style.display = "block";
+        hFilters.classList.toggle("collapsed", isFilterCollapsed);
+        const tBtn = document.getElementById("toggle-filter-btn");
+        if (tBtn) {
+          tBtn.classList.toggle("expanded", !isFilterCollapsed);
+          tBtn.innerHTML = isFilterCollapsed ? icons.chevron_down : icons.chevron_up;
+        }
+      }
+    } else {
+      if (hFilters) hFilters.classList.add("collapsed");
+    }
+  }
+
   const cPopover = document.getElementById("calendar-popover");
   if (cPopover) cPopover.style.display = "none";
 
@@ -233,6 +279,7 @@ function _switchViewInternal(viewName) {
     "channel-videos": "Channel Activity",
     backup: "Backup & Restore",
     settings: "Settings",
+    keybinds: "Keybinds"
   };
   const titleText = document.getElementById("view-title-text");
   const backBtn = document.getElementById("view-back-btn");
@@ -459,6 +506,47 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   attachNav("nav-analytics", "analytics");
   attachNav("nav-settings", "settings");
 
+  const navKeybinds = document.getElementById("nav-keybinds");
+  if (navKeybinds) {
+    navKeybinds.onclick = (e) => {
+      e.stopPropagation();
+      switchView("keybinds");
+    };
+  }
+
+  const resetKeybindsBtn = document.getElementById("reset-keybinds");
+  if (resetKeybindsBtn) {
+    resetKeybindsBtn.onclick = (e) => {
+      e.stopPropagation();
+      showConfirmModal({
+        title: "Reset Shortcuts?",
+        message: "Are you sure you want to restore all keyboard shortcuts to their default settings?",
+        confirmText: "Reset",
+        cancelText: "Cancel",
+        icon: "⌨️",
+        onConfirm: () => {
+          keybindSettings = {
+            toggleSidebar: "Alt+S",
+            toggleFloating: "Alt+F",
+            toggleDislike: "Alt+D",
+            toggleShorts: "Alt+B",
+            navHistory: "Alt+Q",
+            navAnalytics: "Alt+W",
+            navChannels: "Alt+E",
+            navBackup: "Alt+R",
+            navSettings: "Alt+T",
+            navShortcuts: "Alt+Y",
+            manualBackup: "Alt+U"
+          };
+          if (typeof safeStorageSet === "function") {
+            safeStorageSet({ ytt_keybind_settings: keybindSettings });
+          }
+          if (typeof renderKeybinds === "function") renderKeybinds();
+        }
+      });
+    };
+  }
+
   const navBackup = document.getElementById("nav-backup");
   if (navBackup) {
     navBackup.onclick = (e) => {
@@ -539,22 +627,16 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   if (intervalMinus) {
     intervalMinus.onclick = (e) => {
       e.stopPropagation();
-      breakSettings.intervalMinutes = Math.max(
-        1,
-        breakSettings.intervalMinutes - 1,
-      );
-      if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
+      breakSettings.intervalValue = Math.max(1, breakSettings.intervalValue - 1);
+      if (intervalValue) intervalValue.value = breakSettings.intervalValue;
       saveBreakSettings();
     };
   }
   if (intervalPlus) {
     intervalPlus.onclick = (e) => {
       e.stopPropagation();
-      breakSettings.intervalMinutes = Math.min(
-        120,
-        breakSettings.intervalMinutes + 1,
-      );
-      if (intervalValue) intervalValue.value = breakSettings.intervalMinutes;
+      breakSettings.intervalValue = Math.min(3600, breakSettings.intervalValue + 1);
+      if (intervalValue) intervalValue.value = breakSettings.intervalValue;
       saveBreakSettings();
     };
   }
@@ -562,10 +644,100 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     intervalValue.onchange = (e) => {
       let val = parseInt(intervalValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
-      if (val > 120) val = 120;
-      breakSettings.intervalMinutes = val;
+      if (val > 3600) val = 3600;
+      breakSettings.intervalValue = val;
       intervalValue.value = val;
       saveBreakSettings();
+    };
+  }
+
+  const unitDropdown = document.getElementById("interval-unit-dropdown");
+  if (unitDropdown) {
+    const trigger = unitDropdown.querySelector(".dropdown-trigger");
+    const items = unitDropdown.querySelectorAll(".dropdown-item");
+
+    trigger.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = unitDropdown.classList.contains("open");
+      document.querySelectorAll(".custom-dropdown.open").forEach((d) => {
+        if (d !== unitDropdown) d.classList.remove("open");
+      });
+      unitDropdown.classList.toggle("open");
+    };
+
+    items.forEach((item) => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const value = item.dataset.value;
+        breakSettings.intervalUnit = value;
+        saveBreakSettings();
+
+        unitDropdown.dataset.value = value;
+        trigger.querySelector("span").textContent =
+          value === "minutes" ? "min" : "sec";
+        items.forEach((i) => i.classList.remove("active"));
+        item.classList.add("active");
+        unitDropdown.classList.remove("open");
+      };
+    });
+  }
+
+  const sfToggle = document.getElementById("smart-fullscreen-toggle");
+  if (sfToggle) {
+    sfToggle.onchange = (e) => {
+      e.stopPropagation();
+      smartFullscreenSettings.enabled = sfToggle.checked;
+      saveSmartFullscreenSettings();
+    };
+  }
+
+  const opacityToggle = document.getElementById("opacity-enabled-toggle");
+  const opacitySlider = document.getElementById("opacity-value-slider");
+  const opacityLabel = document.getElementById("opacity-percentage-label");
+  const opacitySliderContainer = document.getElementById("opacity-slider-container");
+
+  if (opacityToggle) {
+    opacityToggle.onchange = (e) => {
+      e.stopPropagation();
+      opacitySettings.enabled = opacityToggle.checked;
+      if (opacitySliderContainer) {
+        opacitySliderContainer.style.display = opacityToggle.checked ? "flex" : "none";
+      }
+      saveOpacitySettings();
+      applyOpacityState();
+    };
+  }
+
+  if (opacitySlider) {
+    // Initial color sync
+    updateSliderProgress(opacitySlider);
+
+    opacitySlider.oninput = (e) => {
+      e.stopPropagation();
+      const val = parseFloat(opacitySlider.value);
+      opacitySettings.value = val;
+      if (opacityLabel) {
+        opacityLabel.textContent = Math.round(val * 100) + "%";
+      }
+      updateSliderProgress(opacitySlider);
+      saveOpacitySettings();
+      applyOpacityState();
+    };
+
+    opacitySlider.onkeydown = (e) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.stopPropagation();
+        e.preventDefault();
+        const step = 0.01;
+        const current = parseFloat(opacitySlider.value);
+        if (e.key === "ArrowRight") {
+          opacitySlider.value = Math.min(1, current + step);
+        } else {
+          opacitySlider.value = Math.max(0, current - step);
+        }
+        // Trigger input event to update UI and state
+        opacitySlider.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     };
   }
 
@@ -796,8 +968,12 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
                           s.ytt_dislike_settings.enabled;
                       if (s.ytt_break_settings) {
                         breakSettings.enabled = s.ytt_break_settings.enabled;
-                        breakSettings.intervalMinutes =
-                          s.ytt_break_settings.intervalMinutes;
+                        breakSettings.intervalValue =
+                          s.ytt_break_settings.intervalValue ??
+                          s.ytt_break_settings.intervalMinutes ??
+                          15;
+                        breakSettings.intervalUnit =
+                          s.ytt_break_settings.intervalUnit || "minutes";
                         breakSettings.workUrl = s.ytt_break_settings.workUrl;
                       }
                       if (s.ytt_backup_settings)
@@ -810,12 +986,31 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
                           ...retentionSettings,
                           ...s.ytt_retention_settings,
                         };
+                      if (s.ytt_opacity_settings)
+                        opacitySettings = {
+                          ...opacitySettings,
+                          ...s.ytt_opacity_settings,
+                        };
+                      if (s.ytt_smart_fullscreen_settings)
+                        smartFullscreenSettings = {
+                          ...smartFullscreenSettings,
+                          ...s.ytt_smart_fullscreen_settings,
+                        };
+                      if (s.ytt_keybind_settings)
+                        keybindSettings = {
+                          ...keybindSettings,
+                          ...s.ytt_keybind_settings,
+                        };
 
                       // Apply live side-effects
                       if (typeof applyShortsBlockerState === "function")
                         applyShortsBlockerState();
                       if (typeof applyDislikeCountState === "function")
                         applyDislikeCountState();
+                      if (typeof applyOpacityState === "function")
+                        applyOpacityState();
+                      if (typeof applyFloatingPlayerState === "function")
+                        applyFloatingPlayerState();
                     }
 
                     // Give storage.onChanged and DOM a moment to settle for total reliability
@@ -865,15 +1060,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   if (createBackupBtn) {
     createBackupBtn.onclick = (e) => {
       e.stopPropagation();
-      createBackupBtn.disabled = true;
-      const originalHtml = createBackupBtn.innerHTML;
-      createBackupBtn.textContent = "Backing up...";
-
-      safeSendMessage({ action: "CREATE_BACKUP_MANUAL" }, () => {
-        createBackupBtn.disabled = false;
-        createBackupBtn.innerHTML = originalHtml;
-        renderBackups();
-      });
+      window.triggerManualBackup();
     };
   }
 
@@ -895,7 +1082,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
           // Update UI elements immediately
           const intervalVal = document.getElementById("interval-value");
-          if (intervalVal) intervalVal.value = breakSettings.intervalMinutes;
+          if (intervalVal) intervalVal.value = breakSettings.intervalValue;
 
           const sToggle = document.getElementById("shorts-blocker-toggle");
           if (sToggle) sToggle.checked = shortsBlockerSettings.enabled;
@@ -940,6 +1127,8 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       const isCollapsed = subheader.classList.contains("collapsed");
       const shouldCollapse =
         forceState !== undefined ? !forceState : !isCollapsed;
+
+      isFilterCollapsed = shouldCollapse; // Set preference to the manually requested state
 
       subheader.classList.toggle("collapsed", shouldCollapse);
       toggleBtn.classList.toggle("expanded", !shouldCollapse);
@@ -996,19 +1185,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   btn.onclick = (e) => {
     if (dragStatus.isDragging) return; // Don't toggle if we were dragging
     e.stopPropagation();
-    isStatsOpen = !isStatsOpen;
-
-    sidebar.classList.toggle("open", isStatsOpen);
-    btn.classList.toggle("active", isStatsOpen);
-
-    if (isStatsOpen) {
-      document.body.classList.add("stats-sidebar-active");
-      document.body.style.overflow = "hidden";
-      renderStats();
-    } else {
-      document.body.classList.remove("stats-sidebar-active");
-      document.body.style.overflow = "";
-    }
+    toggleStats();
   };
 
   const closeBtn = document.getElementById("close-stats");
@@ -1020,6 +1197,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       btn.classList.remove("active");
       document.body.classList.remove("stats-sidebar-active");
       document.body.style.overflow = "";
+      if (typeof restoreIsolation === "function") restoreIsolation();
     };
   }
 
@@ -1031,6 +1209,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       btn.classList.remove("active");
       document.body.classList.remove("stats-sidebar-active");
       document.body.style.overflow = "";
+      if (typeof restoreIsolation === "function") restoreIsolation();
     }
   });
 
@@ -1067,6 +1246,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       btn.classList.remove("active");
       document.body.classList.remove("stats-sidebar-active");
       document.body.style.overflow = "";
+      if (typeof restoreIsolation === "function") restoreIsolation();
     }
   });
 
@@ -1150,8 +1330,12 @@ function renderBackups() {
                         s.ytt_dislike_settings.enabled;
                     if (s.ytt_break_settings) {
                       breakSettings.enabled = s.ytt_break_settings.enabled;
-                      breakSettings.intervalMinutes =
-                        s.ytt_break_settings.intervalMinutes;
+                      breakSettings.intervalValue =
+                        s.ytt_break_settings.intervalValue ??
+                        s.ytt_break_settings.intervalMinutes ??
+                        15;
+                      breakSettings.intervalUnit =
+                        s.ytt_break_settings.intervalUnit || "minutes";
                       breakSettings.workUrl = s.ytt_break_settings.workUrl;
                     }
                     if (s.ytt_backup_settings)
@@ -1165,11 +1349,31 @@ function renderBackups() {
                         ...s.ytt_retention_settings,
                       };
 
+                    if (s.ytt_opacity_settings)
+                      opacitySettings = {
+                        ...opacitySettings,
+                        ...s.ytt_opacity_settings,
+                      };
+                    if (s.ytt_smart_fullscreen_settings)
+                      smartFullscreenSettings = {
+                        ...smartFullscreenSettings,
+                        ...s.ytt_smart_fullscreen_settings,
+                      };
+                    if (s.ytt_keybind_settings)
+                      keybindSettings = {
+                        ...keybindSettings,
+                        ...s.ytt_keybind_settings,
+                      };
+
                     // Apply live side-effects
                     if (typeof applyShortsBlockerState === "function")
                       applyShortsBlockerState();
                     if (typeof applyDislikeCountState === "function")
                       applyDislikeCountState();
+                    if (typeof applyOpacityState === "function")
+                      applyOpacityState();
+                    if (typeof applyFloatingPlayerState === "function")
+                      applyFloatingPlayerState();
                   }
 
                   // Give storage.onChanged and DOM a moment to settle for total reliability
@@ -1196,33 +1400,41 @@ function renderBackups() {
       item.querySelector(".download-btn").onclick = (e) => {
         e.stopPropagation();
         const id = e.currentTarget.dataset.id;
-        // In extension content scripts, we can't directly use yttDB if it's in a different world,
-        // but since we bundled it into content.js, it should be available.
-        // However, it's safer to ask background for the full data and then trigger download here.
-        chrome.runtime.sendMessage(
-          { action: "GET_BACKUPS" },
-          (allFullBackups) => {
-            // Wait, GET_BACKUPS in background now returns metadata only?
-            // I should have a GET_BACKUP_BY_ID in background.
-          },
-        );
-        // Correct approach: ask background for full data via a new message or use GET_BACKUPS if it returned everything.
-        // Actually, my getAllBackups returns metadata only. I need a GET_BACKUP_BY_ID handler.
+        const date = e.currentTarget
+          .closest(".backup-item")
+          .querySelector(".backup-date").textContent;
 
-        // Re-routing through background for full data
+        const btn = e.currentTarget;
+        const originalIcon = btn.innerHTML;
+        btn.innerHTML = icons.loading || "...";
+        btn.disabled = true;
+
         safeSendMessage({ action: "GET_BACKUP_FULL", id: id }, (fullBackup) => {
-          if (fullBackup) {
-            const blob = new Blob([JSON.stringify(fullBackup.data, null, 2)], {
+          btn.innerHTML = originalIcon;
+          btn.disabled = false;
+
+          if (fullBackup && fullBackup.data) {
+            // Include a version and timestamp for the JSON file
+            const exportData = {
+              version: "1.0",
+              exportedAt: new Date().toISOString(),
+              source: id,
+              ...fullBackup.data,
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], {
               type: "application/json",
             });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `ytt_backup_${id}_${new Date(fullBackup.timestamp).toISOString().split("T")[0]}.json`;
+            a.download = `ytt-backup-${date.replace(/[/:\s]/g, "-")}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+          } else {
+            alert("Failed to fetch full backup data for download.");
           }
         });
       };
@@ -1249,4 +1461,231 @@ function renderBackups() {
       list.appendChild(item);
     });
   });
+}
+
+/**
+ * Renders the list of keybinds in the keybinds-view
+ */
+function renderKeybinds() {
+  const container = document.getElementById("keybinds-list-container");
+  if (!container) return;
+
+  const categories = [
+    {
+      title: "Navigation",
+      actions: [
+        { id: "navHistory", label: "Watch History", desc: "Instantly jump to your watch history timeline", icon: icons.history },
+        { id: "navAnalytics", label: "Analytics Stats", desc: "View detailed charts and usage statistics", icon: icons.analytics },
+        { id: "navChannels", label: "Channels", desc: "View watch time broken down by channel", icon: icons.analytics },
+        { id: "navBackup", label: "Backups & Sync", desc: "Manage your data backups and sync settings", icon: icons.backup },
+        { id: "navSettings", label: "Settings Menu", desc: "Access all extension preferences", icon: icons.settings },
+        { id: "navShortcuts", label: "Hotkeys", desc: "Open this shortcuts settings page", icon: icons.settings }
+      ]
+    },
+    {
+      title: "Feature Controls",
+      actions: [
+        { id: "toggleSidebar", label: "Toggle Sidebar", desc: "Open or close the time tracker sidebar", icon: icons.history },
+        { id: "toggleFloating", label: "Floating Mode", desc: "Toggle the resizable PiP video player", icon: icons.pip },
+        { id: "toggleDislike", label: "Dislike Counter", desc: "Toggle visibility of the dislike count", icon: icons.dislike },
+        { id: "toggleShorts", label: "Shorts Blocker", desc: "Instantly enable/disable the shorts filter", icon: icons.close },
+        { id: "toggleOpacity", label: "Toggle Opacity", desc: "Dim/undim the YouTube background", icon: icons.eye },
+        { id: "manualBackup", label: "Manual Backup", desc: "Save a snapshot of your current data", icon: icons.backup }
+      ]
+    }
+  ];
+
+  container.innerHTML = categories.map(cat => `
+    <div class="keybind-section">
+      <div class="section-title">${cat.title}</div>
+      <div class="settings-card">
+        ${cat.actions.map(action => `
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <div class="label-with-icon">
+                <div class="item-icon">${action.icon}</div>
+                <span class="settings-item-label">${action.label}</span>
+              </div>
+              <span class="settings-item-desc">${action.desc}</span>
+            </div>
+            <div class="keybind-display" id="bind-${action.id}" data-action="${action.id}" title="Click to remap">
+              ${keybindSettings[action.id] || "None"}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Add click listeners for recording
+  container.querySelectorAll(".keybind-display").forEach(display => {
+    display.onclick = () => startRecordingKeybind(display);
+  });
+}
+
+/**
+ * Handles the key recording process (Quick Copy pattern)
+ * Uses keydown to build combo, keyup to finalize when all released.
+ */
+let isRecording = false;
+function startRecordingKeybind(display) {
+  if (isRecording) return;
+  isRecording = true;
+
+  const actionId = display.dataset.action;
+  const originalText = display.innerText;
+
+  // Visual feedback — highlight active, dim others
+  display.classList.add("recording");
+  display.innerText = "Press keys...";
+
+  const allDisplays = document.querySelectorAll(".keybind-display");
+  allDisplays.forEach(d => {
+    if (d !== display) d.style.opacity = "0.3";
+  });
+
+  let activeKeys = [];          // Ordered array for display
+  let pressedKeysSet = new Set(); // Tracks physical keys to avoid keydown repeats
+
+  function getReadableKeyName(e) {
+    const code = e.code;
+    const key = e.key;
+
+    // Modifier keys with L/R distinction
+    const modifiers = {
+      ShiftLeft: "Shift", ShiftRight: "Shift",
+      ControlLeft: "Ctrl", ControlRight: "Ctrl",
+      AltLeft: "Alt", AltRight: "Alt",
+      MetaLeft: "Meta", MetaRight: "Meta"
+    };
+    if (modifiers[code]) return modifiers[code];
+
+    // Regular keys
+    if (key === " ") return "Space";
+    if (key.length === 1) return key.toUpperCase();
+    return key;
+  }
+
+  const handleKeyDown = (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if (e.key === "Escape") {
+      cancelRecording();
+      return;
+    }
+
+    const keyName = getReadableKeyName(e);
+    if (!pressedKeysSet.has(e.code)) {
+      pressedKeysSet.add(e.code);
+      // Avoid duplicate named keys (e.g. ShiftLeft and ShiftRight both become "Shift")
+      if (!activeKeys.includes(keyName)) {
+        activeKeys.push(keyName);
+      }
+      display.innerText = activeKeys.join("+");
+    }
+  };
+
+  const handleKeyUp = (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    pressedKeysSet.delete(e.code);
+
+    // When all keys are released and we have a combo, finalize
+    if (pressedKeysSet.size === 0 && activeKeys.length > 0) {
+      finalizeRecording();
+    }
+  };
+
+  const finalizeRecording = () => {
+    const combination = activeKeys.join("+");
+    keybindSettings[actionId] = combination;
+    display.innerText = combination;
+
+    // Save to storage
+    if (typeof safeStorageSet === "function") {
+      safeStorageSet({ ytt_keybind_settings: keybindSettings });
+    }
+    cleanup();
+  };
+
+  const cancelRecording = () => {
+    display.innerText = originalText;
+    cleanup();
+  };
+
+  const cleanup = () => {
+    isRecording = false;
+    display.classList.remove("recording");
+    allDisplays.forEach(d => { d.style.opacity = ""; });
+    window.removeEventListener("keydown", handleKeyDown, true);
+    window.removeEventListener("keyup", handleKeyUp, true);
+    window.removeEventListener("blur", cancelRecording);
+  };
+
+  window.addEventListener("keydown", handleKeyDown, true);
+  window.addEventListener("keyup", handleKeyUp, true);
+  window.addEventListener("blur", cancelRecording);
+}
+
+window.toggleStats = function() {
+  const sidebar = document.getElementById("stats-sidebar");
+  const btn = document.getElementById("stats-toggle-btn");
+  if (!sidebar || !btn) return;
+
+  isStatsOpen = !isStatsOpen;
+
+  sidebar.classList.toggle("open", isStatsOpen);
+  btn.classList.toggle("active", isStatsOpen);
+
+  if (isStatsOpen) {
+    document.body.classList.add("stats-sidebar-active");
+    document.body.style.overflow = "hidden";
+    if (typeof renderStats === "function") renderStats();
+    if (typeof isolateModal === "function") isolateModal(sidebar);
+    // Auto-focus sidebar for keyboard navigation
+    setTimeout(() => sidebar.focus(), 300);
+  } else {
+    document.body.classList.remove("stats-sidebar-active");
+    document.body.style.overflow = "";
+    if (typeof restoreIsolation === "function") restoreIsolation();
+  }
+};
+window.switchView = function(viewName) {
+  if (viewName !== activeView) {
+    viewHistory.push(viewName);
+    // Keep stack manageable
+    if (viewHistory.length > 20) viewHistory.shift();
+  }
+  _switchViewInternal(viewName);
+};
+
+window.triggerManualBackup = function() {
+  const createBackupBtn = document.getElementById("create-manual-backup");
+  if (createBackupBtn) {
+    createBackupBtn.disabled = true;
+    const originalHtml = createBackupBtn.innerHTML;
+    createBackupBtn.textContent = "Backing up...";
+
+    safeSendMessage({ action: "CREATE_BACKUP_MANUAL" }, () => {
+      createBackupBtn.disabled = false;
+      createBackupBtn.innerHTML = originalHtml;
+      if (activeView === "backup") renderBackups();
+    });
+  } else {
+    // If btn doesn't exist (not in DOM), just send message
+    safeSendMessage({ action: "CREATE_BACKUP_MANUAL" }, () => {
+       if (activeView === "backup") renderBackups();
+    });
+  }
+};
+function updateSliderProgress(slider) {
+  if (!slider) return;
+  const val = slider.value;
+  const min = slider.min || 0;
+  const max = slider.max || 1;
+  const percent = ((val - min) / (max - min)) * 100;
+
+  slider.style.background = `linear-gradient(to right, var(--stats-primary) 0%, var(--stats-primary) ${percent}%, var(--stats-input-bg) ${percent}%, var(--stats-input-bg) 100%)`;
 }

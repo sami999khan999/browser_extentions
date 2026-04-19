@@ -341,7 +341,7 @@ function setupObserver() {
         }
     });
 
-    globalObserver.observe(document.body, { childList: true, subtree: true });
+    globalObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 function applyDislikeCountState() {
