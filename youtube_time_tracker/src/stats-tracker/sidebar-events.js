@@ -31,6 +31,14 @@ function syncSettingsUI() {
   if (backupOnCloseToggle)
     backupOnCloseToggle.checked = backupSettings.backupOnClose;
 
+  const backupReminderToggle = document.getElementById("backup-reminder-toggle");
+  if (backupReminderToggle)
+    backupReminderToggle.checked = backupSettings.reminderEnabled;
+
+  const reminderContainer = document.getElementById("reminder-interval-container");
+  if (reminderContainer)
+    reminderContainer.style.display = backupSettings.reminderEnabled ? "flex" : "none";
+
   const smartFullscreenToggle = document.getElementById("smart-fullscreen-toggle");
   if (smartFullscreenToggle)
     smartFullscreenToggle.checked = smartFullscreenSettings.enabled;
@@ -52,13 +60,26 @@ function syncSettingsUI() {
 
   // 2. Numeric & Text Inputs
   const intervalValue = document.getElementById("interval-value");
-  if (intervalValue) intervalValue.value = breakSettings.intervalValue;
+  if (intervalValue && document.activeElement !== intervalValue) {
+    intervalValue.value = breakSettings.intervalValue;
+  }
 
   const workUrlInput = document.getElementById("setting-work-url");
-  if (workUrlInput) workUrlInput.value = breakSettings.workUrl;
+  if (workUrlInput && document.activeElement !== workUrlInput) {
+    workUrlInput.value = breakSettings.workUrl;
+  }
 
   const maxBackupsValue = document.getElementById("max-backups-value");
-  if (maxBackupsValue) maxBackupsValue.value = backupSettings.maxBackups || 10;
+  if (maxBackupsValue && document.activeElement !== maxBackupsValue) {
+    maxBackupsValue.value = backupSettings.maxBackups || 10;
+  }
+
+  const reminderValueInput = document.getElementById("reminder-interval-value");
+  if (reminderValueInput && document.activeElement !== reminderValueInput) {
+    if (backupSettings.reminderInterval !== undefined) {
+      reminderValueInput.value = backupSettings.reminderInterval;
+    }
+  }
 
   // 3. Custom Dropdowns
   const syncDropdown = (id, value, map) => {
@@ -67,7 +88,13 @@ function syncSettingsUI() {
     dropdown.dataset.value = value;
     const triggerSpan = dropdown.querySelector(".dropdown-trigger span");
     if (triggerSpan) {
-      triggerSpan.textContent = map[value] || value + " Days";
+      const defaultLabels = {
+        minutes: "min",
+        seconds: "sec",
+        hours: "hr",
+      };
+      // Prioritize explicit map > default labels > raw value
+      triggerSpan.textContent = (map && map[value]) || defaultLabels[value] || value;
     }
 
     const items = dropdown.querySelectorAll(".dropdown-item");
@@ -87,6 +114,14 @@ function syncSettingsUI() {
     168: "Every Week",
   });
 
+  syncDropdown("reminder-interval-unit-dropdown", backupSettings.reminderUnit, {
+    weeks: "wks",
+    days: "days",
+    hours: "hr",
+    minutes: "min",
+    seconds: "sec",
+  });
+
   syncDropdown("retention-duration-dropdown", retentionSettings.duration, {
     7: "7 Days",
     15: "15 Days",
@@ -102,6 +137,7 @@ function syncSettingsUI() {
   syncDropdown("interval-unit-dropdown", breakSettings.intervalUnit, {
     minutes: "min",
     seconds: "sec",
+    hours: "hr",
   });
 
   // 4. Special internal UI syncs
@@ -612,12 +648,14 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
   const workUrlInput = document.getElementById("setting-work-url");
   if (workUrlInput) {
-    workUrlInput.onchange = (e) => {
+    const updateWorkUrl = () => {
       let url = workUrlInput.value.trim();
       if (url && !url.startsWith("http")) url = "https://" + url;
       breakSettings.workUrl = url || "https://www.google.com";
       saveBreakSettings();
     };
+    workUrlInput.onchange = updateWorkUrl;
+    workUrlInput.oninput = updateWorkUrl;
   }
 
   const intervalMinus = document.getElementById("interval-minus");
@@ -635,20 +673,26 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   if (intervalPlus) {
     intervalPlus.onclick = (e) => {
       e.stopPropagation();
-      breakSettings.intervalValue = Math.min(3600, breakSettings.intervalValue + 1);
+      breakSettings.intervalValue = breakSettings.intervalValue + 1;
       if (intervalValue) intervalValue.value = breakSettings.intervalValue;
       saveBreakSettings();
     };
   }
   if (intervalValue) {
-    intervalValue.onchange = (e) => {
+    const updateInterval = () => {
       let val = parseInt(intervalValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
-      if (val > 3600) val = 3600;
       breakSettings.intervalValue = val;
-      intervalValue.value = val;
       saveBreakSettings();
     };
+    intervalValue.onchange = () => {
+      // Force constraints on blur
+      let val = parseInt(intervalValue.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      intervalValue.value = val;
+      updateInterval();
+    };
+    intervalValue.oninput = updateInterval;
   }
 
   const unitDropdown = document.getElementById("interval-unit-dropdown");
@@ -673,8 +717,12 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
         saveBreakSettings();
 
         unitDropdown.dataset.value = value;
-        trigger.querySelector("span").textContent =
-          value === "minutes" ? "min" : "sec";
+        const displayLabel = {
+          minutes: "min",
+          seconds: "sec",
+          hours: "hr",
+        }[value];
+        trigger.querySelector("span").textContent = displayLabel || value;
         items.forEach((i) => i.classList.remove("active"));
         item.classList.add("active");
         unitDropdown.classList.remove("open");
@@ -798,6 +846,80 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     });
   }
 
+  const reminderMinus = document.getElementById("reminder-interval-minus");
+  const reminderPlus = document.getElementById("reminder-interval-plus");
+  const reminderValue = document.getElementById("reminder-interval-value");
+
+  if (reminderMinus) {
+    reminderMinus.onclick = (e) => {
+      e.stopPropagation();
+      backupSettings.reminderInterval = Math.max(
+        1,
+        (backupSettings.reminderInterval || 1) - 1,
+      );
+      if (reminderValue) reminderValue.value = backupSettings.reminderInterval;
+      saveBackupSettings();
+    };
+  }
+  if (reminderPlus) {
+    reminderPlus.onclick = (e) => {
+      e.stopPropagation();
+      backupSettings.reminderInterval =
+        (backupSettings.reminderInterval || 1) + 1;
+      if (reminderValue) reminderValue.value = backupSettings.reminderInterval;
+      saveBackupSettings();
+    };
+  }
+  if (reminderValue) {
+    const updateReminderInterval = () => {
+      let val = parseInt(reminderValue.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      backupSettings.reminderInterval = val;
+      saveBackupSettings();
+    };
+    reminderValue.onchange = () => {
+      let val = parseInt(reminderValue.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      reminderValue.value = val;
+      updateReminderInterval();
+    };
+    reminderValue.oninput = updateReminderInterval;
+  }
+
+  const reminderUnitDropdown = document.getElementById(
+    "reminder-interval-unit-dropdown",
+  );
+  if (reminderUnitDropdown) {
+    const trigger = reminderUnitDropdown.querySelector(".dropdown-trigger");
+    const menu = reminderUnitDropdown.querySelector(".dropdown-menu");
+    const items = reminderUnitDropdown.querySelectorAll(".dropdown-item");
+
+    trigger.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = reminderUnitDropdown.classList.contains("open");
+      document
+        .querySelectorAll(".custom-dropdown.open")
+        .forEach((d) => d.classList.remove("open"));
+      if (!isOpen) reminderUnitDropdown.classList.add("open");
+    };
+
+    items.forEach((item) => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const value = item.dataset.value;
+
+        backupSettings.reminderUnit = value;
+        saveBackupSettings();
+
+        reminderUnitDropdown.dataset.value = value;
+        trigger.querySelector("span").textContent = item.textContent;
+        items.forEach((i) => i.classList.remove("active"));
+        item.classList.add("active");
+        reminderUnitDropdown.classList.remove("open");
+      };
+    });
+  }
+
   const retentionDropdown = document.getElementById(
     "retention-duration-dropdown",
   );
@@ -869,14 +991,22 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     };
   }
   if (maxBackupsValue) {
-    maxBackupsValue.onchange = (e) => {
+    const updateMaxBackups = () => {
       let val = parseInt(maxBackupsValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
       if (val > 50) val = 50;
       backupSettings.maxBackups = val;
-      maxBackupsValue.value = val;
       saveBackupSettings();
     };
+    maxBackupsValue.onchange = () => {
+      // Force constraints on blur
+      let val = parseInt(maxBackupsValue.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      if (val > 50) val = 50;
+      maxBackupsValue.value = val;
+      updateMaxBackups();
+    };
+    maxBackupsValue.oninput = updateMaxBackups;
   }
 
   // Close dropdowns on outside click
@@ -1261,6 +1391,18 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   // Initial UI sync
   switchView(activeView);
   updateDateLabel();
+
+  // Stop propagation of shortcut keys to YouTube when typing in our sidebar
+  sidebar.addEventListener(
+    "keydown",
+    (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || e.target.isContentEditable) {
+        e.stopPropagation();
+      }
+    },
+    false,
+  );
 }
 
 /**

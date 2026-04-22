@@ -307,21 +307,23 @@ function getSidebarHTML() {
                             </div>
                              <div class="interval-input-wrapper">
                                  <button class="interval-btn minus" id="interval-minus">−</button>
-                                 <input type="number" id="interval-value" class="interval-value" value="${breakSettings.intervalValue}" min="1" max="3600">
+                                 <input type="number" id="interval-value" class="interval-value" value="${breakSettings.intervalValue}" min="1">
                                  <button class="interval-btn plus" id="interval-plus">+</button>
                                  <div class="custom-dropdown tiny" id="interval-unit-dropdown" data-value="${
                                    breakSettings.intervalUnit
                                  }">
                                     <div class="dropdown-trigger">
                                         <span>${
-                                          breakSettings.intervalUnit ===
-                                          "minutes"
-                                            ? "min"
-                                            : "sec"
+                                          breakSettings.intervalUnit === "hours" 
+                                            ? "hr" 
+                                            : (breakSettings.intervalUnit === "minutes" ? "min" : "sec")
                                         }</span>
                                         <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                     </div>
                                     <div class="dropdown-menu">
+                                        <div class="dropdown-item ${
+                                          breakSettings.intervalUnit === "hours" ? "active" : ""
+                                        }" data-value="hours">hr</div>
                                         <div class="dropdown-item ${
                                           breakSettings.intervalUnit ===
                                           "minutes"
@@ -390,6 +392,52 @@ function getSidebarHTML() {
                                 <input type="checkbox" id="backup-on-close-toggle" ${backupSettings.backupOnClose ? "checked" : ""}>
                                 <span class="toggle-slider"></span>
                             </label>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.history}</span>
+                                    <span class="settings-item-label">Backup Download Reminder</span>
+                                </div>
+                                <span class="settings-item-desc">Show a periodic popup on YouTube to download and save your data</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="backup-reminder-toggle" ${backupSettings.reminderEnabled ? "checked" : ""}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-item vertical" id="reminder-interval-container" style="${backupSettings.reminderEnabled ? "" : "display: none;"}">
+                            <div class="settings-item-info">
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.calendar}</span>
+                                    <span class="settings-item-label">Reminder Interval</span>
+                                </div>
+                                <span class="settings-item-desc">Frequency of the backup download reminder</span>
+                            </div>
+                            <div class="interval-input-wrapper">
+                                <button class="interval-btn minus" id="reminder-interval-minus">−</button>
+                                <input type="number" id="reminder-interval-value" class="interval-value" value="${backupSettings.reminderInterval}" min="1">
+                                <button class="interval-btn plus" id="reminder-interval-plus">+</button>
+                                <div class="custom-dropdown tiny" id="reminder-interval-unit-dropdown" data-value="${backupSettings.reminderUnit || 'hours'}">
+                                    <div class="dropdown-trigger">
+                                        <span>${
+                                            backupSettings.reminderUnit === "weeks" 
+                                                ? "wks" 
+                                                : (backupSettings.reminderUnit === "days" 
+                                                    ? "days" 
+                                                    : (backupSettings.reminderUnit === "hours" ? "hr" : (backupSettings.reminderUnit === "minutes" ? "min" : "sec")))
+                                        }</span>
+                                        <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                    </div>
+                                    <div class="dropdown-menu">
+                                        <div class="dropdown-item ${backupSettings.reminderUnit === "weeks" ? "active" : ""}" data-value="weeks">wks</div>
+                                        <div class="dropdown-item ${backupSettings.reminderUnit === "days" ? "active" : ""}" data-value="days">days</div>
+                                        <div class="dropdown-item ${backupSettings.reminderUnit === "hours" ? "active" : ""}" data-value="hours">hr</div>
+                                        <div class="dropdown-item ${backupSettings.reminderUnit === "minutes" ? "active" : ""}" data-value="minutes">min</div>
+                                        <div class="dropdown-item ${backupSettings.reminderUnit === "seconds" ? "active" : ""}" data-value="seconds">sec</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">

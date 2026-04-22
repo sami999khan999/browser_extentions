@@ -205,14 +205,27 @@ function updateTimerBadge(remainingMinutes) {
   }
 
   badge.style.display = "block";
+  badge.style.background = "#0f0f0f";
 
-  if (remainingMinutes < 1) {
-    const seconds = Math.ceil(remainingMinutes * 60);
-    badge.textContent = `${seconds}s`;
+  if (remainingMinutes >= 52560000) { // 100 years
+    badge.textContent = `${Math.round(remainingMinutes / 52560000)}cen`;
+  } else if (remainingMinutes >= 5256000) { // 10 years
+    badge.textContent = `${Math.round(remainingMinutes / 5256000)}dec`;
+  } else if (remainingMinutes >= 525600) { // 1 year
+    badge.textContent = `${Math.round(remainingMinutes / 525600)}y`;
+  } else if (remainingMinutes >= 43200) { // 30 days
+    badge.textContent = `${Math.round(remainingMinutes / 43200)}mo`;
+  } else if (remainingMinutes >= 10080) { // 7 days
+    badge.textContent = `${Math.round(remainingMinutes / 10080)}w`;
+  } else if (remainingMinutes >= 1440) { // 1 day
+    badge.textContent = `${Math.round(remainingMinutes / 1440)}d`;
+  } else if (remainingMinutes >= 60) { // 1 hour
+    badge.textContent = `${Math.round(remainingMinutes / 60)}h`;
+  } else if (remainingMinutes >= 1) { // 1 minute
+    badge.textContent = `${Math.round(remainingMinutes)}m`;
+  } else { // Seconds
+    badge.textContent = `${Math.round(remainingMinutes * 60)}s`;
     badge.style.background = "#FF0033"; // High urgency
-  } else {
-    badge.textContent = `${Math.ceil(remainingMinutes)}m`;
-    badge.style.background = "#0f0f0f";
   }
 }
 
@@ -236,11 +249,15 @@ function checkBreakReminder() {
   }
 
   const elapsed = (Date.now() - continuousWatchStart) / 1000 / 60; // minutes
-  const intervalMinutes =
-    breakSettings.intervalUnit === "seconds"
-      ? breakSettings.intervalValue / 60
-      : breakSettings.intervalValue;
-
+  let intervalMinutes;
+  if (breakSettings.intervalUnit === "hours") {
+    intervalMinutes = breakSettings.intervalValue * 60;
+  } else if (breakSettings.intervalUnit === "seconds") {
+    intervalMinutes = breakSettings.intervalValue / 60;
+  } else {
+    intervalMinutes = breakSettings.intervalValue;
+  }
+  
   // Pre-fetch quote 5 seconds before the interval (5/60 minutes)
   const preFetchThreshold = intervalMinutes - 5 / 60;
   if (elapsed >= preFetchThreshold && !preFetchedQuote && !isFetchingQuote) {

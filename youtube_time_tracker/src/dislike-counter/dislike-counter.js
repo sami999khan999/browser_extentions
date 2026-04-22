@@ -308,14 +308,18 @@ function doRender(data, videoId, btn) {
     btn.dataset.yttDislikeVideo = videoId;
 
     label.style.cssText = `
-        display: inline-block !important;
+        display: inline-flex !important;
+        align-items: center !important;
         margin-left: 6px !important;
+        vertical-align: middle !important;
+        line-height: 1 !important;
         opacity: 1 !important;
         visibility: visible !important;
         font-family: inherit !important;
         font-size: 14px !important;
         font-weight: 500 !important;
         color: inherit !important;
+        white-space: nowrap !important;
     `;
 
     forceVisibility(btn);

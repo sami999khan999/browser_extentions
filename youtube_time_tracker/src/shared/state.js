@@ -26,6 +26,9 @@ let backupSettings = {
   intervalHours: 24,
   backupOnClose: true,
   maxBackups: 10,
+  reminderEnabled: true,
+  reminderInterval: 24,
+  reminderUnit: "hours",
 };
 let retentionSettings = {
   duration: 7, // Default 7 days
@@ -95,7 +98,7 @@ async function initState() {
         let shortsSettings = data.ytt_shorts_settings;
         let bSettings = data.ytt_break_settings;
 
-        // Migration from localStorage for existing users
+        // 1. Migration from legacy localStorage (one-time)
         if (!data.ytt_migrated) {
           try {
             const localHistory = localStorage.getItem("ytt_history");
@@ -114,6 +117,32 @@ async function initState() {
             safeStorageSet({ ytt_migrated: true });
           } catch (e) {
             console.error("Migration failed:", e);
+          }
+        }
+
+        // 2. Failsafe Recovery (if chrome.storage.local was wiped due to extension removal)
+        if (!history || Object.keys(history).length === 0) {
+          try {
+            const failsafe = localStorage.getItem("ytt_failsafe_backup");
+            if (failsafe) {
+              const parsed = JSON.parse(failsafe);
+              if (parsed && (parsed.allHistory || parsed.ytt_history)) {
+                console.log("YouTube Time Tracker: Found failsafe backup. Requesting restore...");
+                
+                // Request background to import this backup properly (populates storage.local & IndexedDB)
+                safeSendMessage({
+                  action: "RESTORE_FROM_FAILSAFE",
+                  data: parsed
+                });
+                
+                // Temporarily apply to local memory so UI can render immediately
+                history = parsed.allHistory || parsed.ytt_history;
+                if (parsed.shortsBlockerSettings) shortsSettings = parsed.shortsBlockerSettings;
+                if (parsed.breakSettings) bSettings = parsed.breakSettings;
+              }
+            }
+          } catch (e) {
+            console.error("Failsafe recovery failed:", e);
           }
         }
 
@@ -240,7 +269,7 @@ function safeStorageGet(keys, callback) {
   }
 }
 
-// Runtime message listener for instant syncing
+// Runtime message listener for instant syncing & failsafe
 runtime.onMessage.addListener((request) => {
   if (request.action === "HISTORY_UPDATE") {
     allHistory = request.allHistory;
@@ -248,8 +277,21 @@ runtime.onMessage.addListener((request) => {
     if (isStatsOpen) {
       renderStats();
     }
+  } else if (request.action === "SYNC_FAILSAFE") {
+    updateFailsafeBackup(request.data);
   }
 });
+
+function updateFailsafeBackup(data) {
+  try {
+    if (data) {
+      // Mirror the latest backup to localStorage for persistence across uninstalls
+      localStorage.setItem("ytt_failsafe_backup", JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error("YTT: Failed to update failsafe backup:", e.message);
+  }
+}
 
 /**
  * Safely writes to storage.local.
@@ -404,6 +446,9 @@ storage.onChanged.addListener((changes, area) => {
             intervalHours: 24,
             backupOnClose: true,
             maxBackups: 10,
+            reminderEnabled: true,
+            reminderInterval: 24,
+            reminderUnit: "hours",
           },
           ...(changes.ytt_backup_settings.newValue || {}),
         };

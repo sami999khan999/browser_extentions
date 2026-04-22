@@ -44,7 +44,10 @@ const JS_FILES = [
     // 5. Dislike Counter domain
     'dislike-counter/dislike-counter.js',
 
-    // 6. Initialization (must be last)
+    // 6. Backup Reminder popup
+    'shared/reminder.js',
+
+    // 7. Initialization (must be last)
     'init/bootstrap.js',
 ];
 

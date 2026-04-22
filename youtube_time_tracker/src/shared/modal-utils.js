@@ -39,8 +39,10 @@ function isolateModal(modalOverlay) {
         // 2. Any key if the focus is ALREADY inside the modal and it's not a forbidden global shortcut
         // But to be safest, we block everything and only whitelist what's needed.
         
-        if (isTab || isEscape || isActionOnButton) {
-            return; // Normal modal behavior
+        const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+        
+        if (isTab || isEscape || isActionOnButton || isInput) {
+            return; // Normal modal or input behavior
         }
 
         // Block everything else
