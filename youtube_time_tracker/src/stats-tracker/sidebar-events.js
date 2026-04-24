@@ -673,7 +673,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   if (intervalPlus) {
     intervalPlus.onclick = (e) => {
       e.stopPropagation();
-      breakSettings.intervalValue = breakSettings.intervalValue + 1;
+      breakSettings.intervalValue = Math.min(1440, (breakSettings.intervalValue || 15) + 1);
       if (intervalValue) intervalValue.value = breakSettings.intervalValue;
       saveBreakSettings();
     };
@@ -682,6 +682,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     const updateInterval = () => {
       let val = parseInt(intervalValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
+      if (val > 1440) val = 1440;
       breakSettings.intervalValue = val;
       saveBreakSettings();
     };
@@ -689,6 +690,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       // Force constraints on blur
       let val = parseInt(intervalValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
+      if (val > 1440) val = 1440;
       intervalValue.value = val;
       updateInterval();
     };
@@ -808,6 +810,19 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     };
   }
 
+  const backupReminderToggle = document.getElementById("backup-reminder-toggle");
+  const reminderIntervalContainer = document.getElementById("reminder-interval-container");
+  if (backupReminderToggle) {
+    backupReminderToggle.onchange = (e) => {
+      e.stopPropagation();
+      backupSettings.reminderEnabled = backupReminderToggle.checked;
+      if (reminderIntervalContainer) {
+        reminderIntervalContainer.style.display = backupReminderToggle.checked ? "flex" : "none";
+      }
+      saveBackupSettings();
+    };
+  }
+
   const backupDropdown = document.getElementById("backup-interval-dropdown");
   if (backupDropdown) {
     const trigger = backupDropdown.querySelector(".dropdown-trigger");
@@ -864,8 +879,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   if (reminderPlus) {
     reminderPlus.onclick = (e) => {
       e.stopPropagation();
-      backupSettings.reminderInterval =
-        (backupSettings.reminderInterval || 1) + 1;
+      backupSettings.reminderInterval = Math.min(10080, (backupSettings.reminderInterval || 1) + 1);
       if (reminderValue) reminderValue.value = backupSettings.reminderInterval;
       saveBackupSettings();
     };
@@ -874,12 +888,14 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     const updateReminderInterval = () => {
       let val = parseInt(reminderValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
+      if (val > 10080) val = 10080;
       backupSettings.reminderInterval = val;
       saveBackupSettings();
     };
     reminderValue.onchange = () => {
       let val = parseInt(reminderValue.value, 10);
       if (isNaN(val) || val < 1) val = 1;
+      if (val > 10080) val = 10080;
       reminderValue.value = val;
       updateReminderInterval();
     };
@@ -918,6 +934,14 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
         reminderUnitDropdown.classList.remove("open");
       };
     });
+  }
+
+  const testBackupBtn = document.getElementById("test-backup-reminder");
+  if (testBackupBtn) {
+    testBackupBtn.onclick = (e) => {
+      e.stopPropagation();
+      safeSendMessage({ action: "TEST_BACKUP_REMINDER" });
+    };
   }
 
   const retentionDropdown = document.getElementById(
@@ -1010,7 +1034,10 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   }
 
   // Close dropdowns on outside click
-  document.addEventListener("click", () => {
+  document.addEventListener("click", (e) => {
+    // If we click inside any custom-dropdown trigger, let its own handler manage it
+    if (e.target.closest(".dropdown-trigger")) return;
+
     document
       .querySelectorAll(".custom-dropdown.open")
       .forEach((d) => d.classList.remove("open"));
@@ -1370,7 +1397,19 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       popover.style.display = "none";
     }
 
-    if (isStatsOpen && !sidebar.contains(e.target) && e.target !== btn) {
+    if (isStatsOpen && !sidebar.contains(e.target) && !btn.contains(e.target)) {
+      // Robustness: Ignore clicks on spontaneous popups so clearing them
+      // during sidebar open doesn't accidentally trigger this "close" logic.
+      const ignoreIds = [
+        "ytt-backup-reminder",
+        "break-reminder-modal",
+        "stats-multitab-toast",
+        "stats-multitab-modal",
+      ];
+      for (const id of ignoreIds) {
+        if (document.getElementById(id)?.contains(e.target)) return;
+      }
+
       isStatsOpen = false;
       sidebar.classList.remove("open");
       btn.classList.remove("active");
@@ -1570,7 +1609,7 @@ function renderBackups() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `ytt-backup-${date.replace(/[/:\s]/g, "-")}.json`;
+            a.download = `ytt-backup_${date.replace(/[,]/g, "").replace(/[/\s:]/g, "-").replace(/-+/g, "-")}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1771,6 +1810,46 @@ function startRecordingKeybind(display) {
   window.addEventListener("blur", cancelRecording);
 }
 
+/**
+ * Closes all active spontaneous popups (Reminders, Multi-tab warnings)
+ * to ensure they don't overlap with the sidebar.
+ */
+function closeAllActivePopups() {
+  // 1. Backup Reminder
+  const backupReminder = document.getElementById("ytt-backup-reminder");
+  if (backupReminder) {
+    const xBtn =
+      backupReminder.querySelector("#ytt-reminder-x") ||
+      backupReminder.querySelector(".close-btn");
+    if (xBtn) xBtn.click();
+    else backupReminder.remove();
+  }
+
+  // 2. Break Reminder
+  const breakModal = document.getElementById("break-reminder-modal");
+  if (breakModal) {
+    const closeBtn = document.getElementById("break-keep-watching");
+    if (closeBtn) closeBtn.click();
+    else breakModal.remove();
+  }
+
+  // 3. Multi-tab Toast
+  const multiTabToast = document.getElementById("stats-multitab-toast");
+  if (multiTabToast) {
+    const dismissBtn = document.getElementById("toast-dismiss");
+    if (dismissBtn) dismissBtn.click();
+    else multiTabToast.remove();
+  }
+
+  // 4. Multi-tab Modal
+  const multiTabModal = document.getElementById("stats-multitab-modal");
+  if (multiTabModal) {
+    const keepBtn = document.getElementById("modal-keep-this");
+    if (keepBtn) keepBtn.click();
+    else multiTabModal.remove();
+  }
+}
+
 window.toggleStats = function() {
   const sidebar = document.getElementById("stats-sidebar");
   const btn = document.getElementById("stats-toggle-btn");
@@ -1782,6 +1861,7 @@ window.toggleStats = function() {
   btn.classList.toggle("active", isStatsOpen);
 
   if (isStatsOpen) {
+    closeAllActivePopups();
     document.body.classList.add("stats-sidebar-active");
     document.body.style.overflow = "hidden";
     if (typeof renderStats === "function") renderStats();

@@ -289,6 +289,9 @@ runtime.onMessage.addListener((request, sender, sendResponse) => {
               console.error("BG: Dislike fetch error:", err);
               safeResponse(null);
             });
+        } else if (request.action === "TEST_BACKUP_REMINDER") {
+          broadcastBackupReminder();
+          safeResponse({ success: true });
         } else {
           // Fallback for unknown actions
           safeResponse({ error: "Unknown action: " + request.action });
@@ -768,33 +771,11 @@ function scheduleAlarms() {
     }
   });
 
-  // 2. Periodic Download Reminder Popup
-  chrome.alarms.clear("ytt_backup_reminder", () => {
-    if (backupSettings.reminderEnabled && backupSettings.reminderInterval > 0) {
-      let multiplier = 1;
-      if (backupSettings.reminderUnit === "seconds") multiplier = 1 / 60;
-      else if (backupSettings.reminderUnit === "minutes") multiplier = 1;
-      else if (backupSettings.reminderUnit === "hours") multiplier = 60;
-      else if (backupSettings.reminderUnit === "days") multiplier = 1440;
-      else if (backupSettings.reminderUnit === "weeks") multiplier = 10080;
-
-      const period = Math.max(1, backupSettings.reminderInterval * multiplier);
-      console.log(`YTT: Scheduling backup reminder every ${period} minutes (Unit: ${backupSettings.reminderUnit}, Value: ${backupSettings.reminderInterval})`);
-      
-      chrome.alarms.create("ytt_backup_reminder", {
-        periodInMinutes: period,
-      });
-    } else {
-      console.log("YTT: Backup reminder disabled or interval 0.");
-    }
-  });
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "ytt_periodic_backup") {
     createBackup();
-  } else if (alarm.name === "ytt_backup_reminder") {
-    broadcastBackupReminder();
   }
 });
 

@@ -22,6 +22,7 @@
             }
             updateStats();
             checkBreakReminder();
+            if (typeof checkBackupReminder === 'function') checkBackupReminder();
         } catch (e) {
             if (e.message.includes('context invalidated')) {
                 window.yttContextInvalidated = true;

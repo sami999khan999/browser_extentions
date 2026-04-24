@@ -232,7 +232,9 @@
   padding: 0 8px 0 12px;
   border-radius: 10px;
   border: 1px solid var(--stats-input-border);
-  height: 42px;
+  height: 38px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .interval-btn {
@@ -258,7 +260,7 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--stats-primary);
-  width: 48px;
+  flex: 1;
   text-align: center;
   background: transparent;
   border: none;
@@ -320,6 +322,32 @@
 }
 .opacity-slider-item {
   border-top: 1px solid var(--stats-border) !important;
+}
+
+/* Side-by-Side Layout for Input Groups */
+.settings-input-group.side-by-side {
+  display: flex !important;
+  gap: 12px !important;
+  width: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  overflow: visible !important;
+}
+
+.settings-input-group.side-by-side .interval-input-wrapper {
+  flex: 1.5;
+  border: 1px solid var(--stats-input-border);
+  border-radius: 10px;
+}
+
+.settings-input-group.side-by-side .custom-dropdown.tiny {
+  flex: 1;
+}
+
+.settings-input-group.side-by-side .custom-dropdown.tiny .dropdown-trigger {
+  border: 1px solid var(--stats-input-border);
+  border-radius: 10px;
+  background: var(--stats-input-bg);
 }
 
 /* Maintenance Action */
@@ -395,18 +423,18 @@
 .custom-dropdown.tiny .dropdown-trigger {
   padding: 0 10px;
   border: none;
-  border-radius: 0 10px 10px 0;
+  border-radius: 0;
   font-size: 11px;
-  height: 100%;
+  height: 38px; /* Match interval-input-wrapper height */
   background: transparent;
   text-transform: uppercase;
   font-weight: 800;
-  gap: 8px;
-  justify-content: center;
+  padding: 0 16px;
+  justify-content: space-between;
 }
 
 .custom-dropdown.tiny .dropdown-trigger:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .custom-dropdown.tiny .dropdown-menu {
@@ -425,9 +453,10 @@
   background: var(--stats-input-bg);
   border: 1px solid var(--stats-input-border);
   color: var(--stats-text-primary);
-  padding: 10px 14px;
+  padding: 0 14px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
+  height: 38px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -461,7 +490,8 @@
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--stats-border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 220px;
   z-index: 1000;
   display: none;
   flex-direction: column;

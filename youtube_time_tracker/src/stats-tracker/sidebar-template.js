@@ -295,30 +295,36 @@ function getSidebarHTML() {
                     <div class="settings-card">
                         <div class="settings-item clickable" id="nav-keybinds">
                             <div class="settings-item-info">
-                                <span class="settings-item-label">Hotkeys & Shortcuts</span>
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.settings}</span>
+                                    <span class="settings-item-label">Hotkeys & Shortcuts</span>
+                                </div>
                                 <span class="settings-item-desc">Customize keyboard shortcuts for all features</span>
                             </div>
                             <span class="chevron-right">${icons.next}</span>
                         </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">
-                                <span class="settings-item-label">Reminder Interval</span>
-                                <span class="settings-item-desc">Minutes or Seconds of watching before a break (1-120)</span>
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.calendar}</span>
+                                    <span class="settings-item-label">Reminder Interval</span>
+                                </div>
+                                <span class="settings-item-desc">Hours, Minutes or Seconds of watching before taking a break</span>
                             </div>
-                             <div class="interval-input-wrapper">
-                                 <button class="interval-btn minus" id="interval-minus">−</button>
-                                 <input type="number" id="interval-value" class="interval-value" value="${breakSettings.intervalValue}" min="1">
-                                 <button class="interval-btn plus" id="interval-plus">+</button>
-                                 <div class="custom-dropdown tiny" id="interval-unit-dropdown" data-value="${
-                                   breakSettings.intervalUnit
-                                 }">
+                              <div class="settings-input-group side-by-side">
+                                 <div class="interval-input-wrapper">
+                                     <button class="interval-btn minus" id="interval-minus">−</button>
+                                     <input type="number" id="interval-value" class="interval-value" value="${breakSettings.intervalValue}" min="1" max="1440" style="width: 100%;">
+                                     <button class="interval-btn plus" id="interval-plus">+</button>
+                                 </div>
+                                 <div class="custom-dropdown tiny" id="interval-unit-dropdown" data-value="${breakSettings.intervalUnit}">
                                     <div class="dropdown-trigger">
                                         <span>${
                                           breakSettings.intervalUnit === "hours" 
                                             ? "hr" 
                                             : (breakSettings.intervalUnit === "minutes" ? "min" : "sec")
                                         }</span>
-                                        <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                        <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                     </div>
                                     <div class="dropdown-menu">
                                         <div class="dropdown-item ${
@@ -342,7 +348,10 @@ function getSidebarHTML() {
                         </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">
-                                <span class="settings-item-label">Go-to-Work URL</span>
+                                <div class="label-with-icon">
+                                    <span class="item-icon">${icons.settings}</span>
+                                    <span class="settings-item-label">Go-to-Work URL</span>
+                                </div>
                                 <span class="settings-item-desc">Target URL for the "Go to Work" break action</span>
                             </div>
                             <input type="text" id="setting-work-url" class="settings-text-input" value="${breakSettings.workUrl}" placeholder="https://google.com">
@@ -410,14 +419,16 @@ function getSidebarHTML() {
                             <div class="settings-item-info">
                                 <div class="label-with-icon">
                                     <span class="item-icon">${icons.calendar}</span>
-                                    <span class="settings-item-label">Reminder Interval</span>
+                                    <span class="settings-item-label">Backup Reminder Interval</span>
                                 </div>
-                                <span class="settings-item-desc">Frequency of the backup download reminder</span>
+                                <span class="settings-item-desc">Time between periodic reminders to download and save your data</span>
                             </div>
-                            <div class="interval-input-wrapper">
-                                <button class="interval-btn minus" id="reminder-interval-minus">−</button>
-                                <input type="number" id="reminder-interval-value" class="interval-value" value="${backupSettings.reminderInterval}" min="1">
-                                <button class="interval-btn plus" id="reminder-interval-plus">+</button>
+                             <div class="settings-input-group side-by-side">
+                                <div class="interval-input-wrapper">
+                                    <button class="interval-btn minus" id="reminder-interval-minus">−</button>
+                                    <input type="number" id="reminder-interval-value" class="interval-value" value="${backupSettings.reminderInterval}" min="1" style="width: 100%;">
+                                    <button class="interval-btn plus" id="reminder-interval-plus">+</button>
+                                </div>
                                 <div class="custom-dropdown tiny" id="reminder-interval-unit-dropdown" data-value="${backupSettings.reminderUnit || 'hours'}">
                                     <div class="dropdown-trigger">
                                         <span>${
@@ -427,7 +438,7 @@ function getSidebarHTML() {
                                                     ? "days" 
                                                     : (backupSettings.reminderUnit === "hours" ? "hr" : (backupSettings.reminderUnit === "minutes" ? "min" : "sec")))
                                         }</span>
-                                        <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                        <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                     </div>
                                     <div class="dropdown-menu">
                                         <div class="dropdown-item ${backupSettings.reminderUnit === "weeks" ? "active" : ""}" data-value="weeks">wks</div>
@@ -438,6 +449,9 @@ function getSidebarHTML() {
                                     </div>
                                 </div>
                             </div>
+                            <button id="test-backup-reminder" class="small-action-btn secondary" style="margin-top: 12px; width: 100%; height: 36px; gap: 6px;">
+                                ${icons.eye} Preview Reminder Popup
+                            </button>
                         </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">

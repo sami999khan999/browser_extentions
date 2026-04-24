@@ -29,6 +29,7 @@ let backupSettings = {
   reminderEnabled: true,
   reminderInterval: 24,
   reminderUnit: "hours",
+  lastReminderTime: 0,
 };
 let retentionSettings = {
   duration: 7, // Default 7 days
@@ -449,6 +450,7 @@ storage.onChanged.addListener((changes, area) => {
             reminderEnabled: true,
             reminderInterval: 24,
             reminderUnit: "hours",
+            lastReminderTime: 0,
           },
           ...(changes.ytt_backup_settings.newValue || {}),
         };

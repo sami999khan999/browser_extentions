@@ -269,6 +269,10 @@ function checkBreakReminder() {
   }
 
   if (elapsed >= intervalMinutes && !breakModalShown) {
+    // Don't show if sidebar is open
+    const sidebar = document.getElementById("stats-sidebar");
+    if (sidebar && sidebar.classList.contains("open")) return;
+
     breakModalShown = true;
     video.pause();
     showBreakModal(preFetchedQuote);

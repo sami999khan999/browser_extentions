@@ -199,8 +199,8 @@ function updateStats(explicitVideoId, isFinalSync) {
         },
         (response) => {
           if (response && response.otherPlayingTabId && isPlaying) {
-            // Only show if we aren't currently showing it, to avoid spam
-            if (!window.multiTabToastShown) {
+            // Only show if we aren't currently showing it, and sidebar is closed
+            if (!window.multiTabToastShown && !isStatsOpen) {
               window.multiTabToastShown = true;
               showMultiTabToast(response.otherPlayingTabId, () => {
                 // Reset flag after a while so it doesn't stay blocked forever

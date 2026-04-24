@@ -41,7 +41,11 @@ async function addBackup(data) {
         
         const backupEntry = {
             timestamp: Date.now(),
-            dateString: new Date().toLocaleString(),
+            dateString: new Date().toLocaleString(undefined, { 
+                month: 'short', day: '2-digit', year: 'numeric', 
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: true 
+            }),
             data: data
         };
 

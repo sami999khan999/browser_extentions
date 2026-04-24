@@ -251,18 +251,59 @@ function showAlertModal({ title, message, buttonText = 'Got it', icon = '⚠️'
 function showMultiTabToast(otherTabId, onDismiss) {
     if (document.getElementById('stats-multitab-toast')) return;
 
-    // Inject keyframes for micro-animations if not present
-    if (!document.getElementById('ytt-toast-keyframes')) {
+    // Inject keyframes once
+    if (!document.getElementById('ytt-toast-styles')) {
         const style = document.createElement('style');
-        style.id = 'ytt-toast-keyframes';
+        style.id = 'ytt-toast-styles';
         style.textContent = `
-            @keyframes ytt-pulse-border {
-                0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
-                70% { box-shadow: 0 0 0 8px rgba(255, 59, 48, 0); }
-                100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+            @keyframes ytt-toast-in {
+                from { transform: translateY(20px) scale(0.95); opacity: 0; }
+                to   { transform: translateY(0) scale(1);     opacity: 1; }
             }
-            .ytt-toast-icon-container {
-                animation: ytt-pulse-border 2s infinite;
+            #stats-multitab-toast {
+                animation: ytt-toast-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+            #toast-close-other {
+                background: linear-gradient(135deg, #e11d48, #be123c);
+                color: #fff;
+                border: none;
+                border-radius: 20px;
+                padding: 0 18px;
+                height: 34px;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+                cursor: pointer;
+                box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
+                white-space: nowrap;
+            }
+            #toast-close-other:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 6px 18px rgba(225, 29, 72, 0.55);
+            }
+            #toast-close-other:active {
+                transform: translateY(0);
+                box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
+            }
+            #toast-dismiss-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                background: transparent;
+                border: none;
+                color: rgba(255,255,255,0.35);
+                font-size: 16px;
+                cursor: pointer;
+                transition: background 0.2s, color 0.2s;
+                flex-shrink: 0;
+            }
+            #toast-dismiss-btn:hover {
+                background: rgba(255,255,255,0.1);
+                color: rgba(255,255,255,0.75);
             }
         `;
         document.head.appendChild(style);
@@ -272,118 +313,104 @@ function showMultiTabToast(otherTabId, onDismiss) {
     toast.id = 'stats-multitab-toast';
     toast.style.cssText = `
         position: fixed;
-        bottom: 32px;
-        right: 32px;
-        background: var(--stats-sidebar-bg);
-        backdrop-filter: blur(16px) saturate(180%);
-        -webkit-backdrop-filter: blur(16px) saturate(180%);
-        color: var(--stats-text-primary);
-        padding: 16px 20px;
-        border-radius: 16px;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--stats-border);
+        bottom: 28px;
+        right: 28px;
+        background: rgba(18, 18, 18, 0.72);
+        backdrop-filter: blur(32px) saturate(200%);
+        -webkit-backdrop-filter: blur(32px) saturate(200%);
+        color: #fff;
+        padding: 14px 14px 14px 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-top: 1px solid rgba(255,255,255,0.2);
+        box-shadow: 0 24px 48px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(0,0,0,0.6);
         display: flex;
         align-items: center;
-        gap: 18px;
+        gap: 14px;
         z-index: 999999;
-        font-family: 'Inter', -apple-system, sans-serif;
-        transform: translateY(120%) scale(0.95);
-        opacity: 0;
-        transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        font-family: -apple-system, 'Inter', BlinkMacSystemFont, sans-serif;
         pointer-events: auto;
+        min-width: 320px;
+        max-width: 400px;
     `;
 
     toast.innerHTML = `
-        <div class="ytt-toast-icon-container" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: var(--stats-card-accent-bg); border-radius: 12px; border: 1.5px solid var(--stats-primary); flex-shrink: 0;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--stats-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
+        <div style="
+            width: 38px; height: 38px; flex-shrink: 0;
+            background: rgba(225, 29, 72, 0.12);
+            border: 1px solid rgba(225, 29, 72, 0.35);
+            border-radius: 11px;
+            display: flex; align-items: center; justify-content: center;
+        ">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <path d="M10 7.5l5 2.5-5 2.5z" fill="#e11d48" stroke="none"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+                <line x1="8"  y1="21" x2="16" y2="21"/>
             </svg>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
-            <div style="font-weight: 700; font-size: 14px; letter-spacing: -0.1px;">Multiple Tabs Active</div>
-            <div style="font-size: 13px; color: var(--stats-text-secondary); line-height: 1.4;">Video is playing in another tab.</div>
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #e11d48; line-height: 1; margin-bottom: 4px;">Playing in two tabs</div>
+            <div style="font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">This video is active elsewhere</div>
         </div>
-        <div style="display: flex; gap: 8px; margin-left: 8px;">
-            <button id="toast-close-other" class="modal-btn premium-primary" style="padding: 0 16px; min-width: 100px;">Close Other</button>
-            <button id="toast-dismiss" class="modal-btn premium-secondary" style="padding: 0 16px;">Ignore</button>
+        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            <button id="toast-close-other">Close Other</button>
+            <button id="toast-dismiss-btn" title="Dismiss">✕</button>
         </div>
     `;
 
     document.body.appendChild(toast);
 
-    // Dynamic Hover & Active States
-    // Dynamic Hover & Active States (Removed for CSS-based states)
-    const closeBtn = document.getElementById('toast-close-other');
-    const dismissBtn = document.getElementById('toast-dismiss');
-
     const removeToast = () => {
-        toast.style.transform = 'translateY(120%) scale(0.95)';
+        toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
         toast.style.opacity = '0';
-        setTimeout(() => {
-            toast.remove();
-            if (onDismiss) onDismiss();
-        }, 500);
+        toast.style.transform = 'translateY(10px) scale(0.97)';
+        setTimeout(() => toast.remove(), 350);
+        if (onDismiss) onDismiss();
     };
 
-    closeBtn.onclick = (e) => {
+    document.getElementById('toast-close-other').onclick = (e) => {
         e.stopPropagation();
         chrome.runtime.sendMessage({ action: 'CLOSE_TAB_BY_ID', tabId: otherTabId });
         removeToast();
     };
 
-    dismissBtn.onclick = (e) => {
+    document.getElementById('toast-dismiss-btn').onclick = (e) => {
         e.stopPropagation();
         removeToast();
     };
-
-    // Animate in smoothly
-    requestAnimationFrame(() => {
-        toast.style.transform = 'translateY(0) scale(1)';
-        toast.style.opacity = '1';
-    });
 }
 
-/**
- * showMultiTabModal - A premium center-screen popup for duplicate videos
- * 
- * @param {number} otherTabId - The ID of the other tab to close
- * @param {Function} onKeep - Callback when the user chooses to keep the current window (and dismiss modal)
- */
 function showMultiTabModal(otherTabId, onKeep) {
     if (document.getElementById('stats-multitab-modal')) return;
 
     const overlay = document.createElement('div');
     overlay.id = 'stats-multitab-modal';
     overlay.className = 'stats-modal-overlay';
+    overlay.style.backdropFilter = 'blur(12px)';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'multitab-title');
 
     overlay.innerHTML = `
-        <div class="stats-modal premium">
-            <div class="ytt-icon-box">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FF0000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <div class="stats-modal premium" style="background: rgba(20, 20, 20, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 30px 60px rgba(0,0,0,0.5);">
+            <div class="ytt-icon-box" style="width: 72px; height: 72px; background: rgba(255,0,51,0.1); border: 2px solid var(--stats-primary); border-radius: 20px; box-shadow: 0 0 30px rgba(255,0,51,0.2);">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--stats-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <path d="M10 7l5 2-5 2z" fill="var(--stats-primary)"></path>
                     <line x1="12" y1="17" x2="12" y2="21"></line>
-                    <path d="M10 7l5 2-5 2z" fill="#FF0000"></path>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
                 </svg>
             </div>
-            <h2 id="multitab-title" class="stats-modal-title" style="margin-bottom: 8px;">Duplicate Playback</h2>
-            <p class="stats-modal-message">We've noticed this video is playing in another window. We've paused it here to keep your tracking accurate.</p>
-            <div class="stats-modal-actions" style="margin-top: 32px;">
-                <button id="modal-keep-this" class="modal-btn premium-secondary">Keep Here</button>
-                <button id="modal-close-other" class="modal-btn premium-primary">Close Other</button>
+            <h2 class="stats-modal-title" style="margin: 20px 0 10px; font-size: 24px; letter-spacing: -0.5px;">Duplicate Playback</h2>
+            <p class="stats-modal-message" style="font-size: 15px; line-height: 1.6; opacity: 0.8; max-width: 320px; margin: 0 auto;">We detected this video is already playing elsewhere. Tracking is paused here.</p>
+            <div class="stats-modal-actions" style="margin-top: 40px; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <button id="modal-keep-this" class="modal-btn secondary" style="height: 48px; border-radius: 12px;">Keep Here</button>
+                <button id="modal-close-other" class="modal-btn premium-primary" style="height: 48px; border-radius: 12px;">Close Other</button>
             </div>
         </div>
     `;
 
     document.body.appendChild(overlay);
-
-    // Prevent background scroll
-    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const keepBtn = document.getElementById('modal-keep-this');
@@ -391,17 +418,15 @@ function showMultiTabModal(otherTabId, onKeep) {
 
     const dismiss = () => {
         overlay.classList.remove('visible');
-        document.body.style.overflow = originalOverflow;
+        document.body.style.overflow = '';
         restoreIsolation();
         setTimeout(() => overlay.remove(), 400);
     };
 
-    // Animation
     requestAnimationFrame(() => {
         overlay.classList.add('visible');
         isolateModal(overlay);
     });
-    setTimeout(() => closeOtherBtn.focus(), 100);
 
     keepBtn.onclick = (e) => {
         e.stopPropagation();
@@ -413,12 +438,9 @@ function showMultiTabModal(otherTabId, onKeep) {
         e.stopPropagation();
         chrome.runtime.sendMessage({ action: 'CLOSE_TAB_BY_ID', tabId: otherTabId });
         dismiss();
-        if (onKeep) onKeep(); // Resume video if they chose to close the other one
+        if (onKeep) onKeep();
     };
 
-    // Close on click outside omitted for this specific high-priority warning to ensure user makes a choice
-
-    // Accessibility: Focus Trap & Escape
     overlay.onkeydown = (e) => {
         if (e.key === 'Tab') {
             const focusables = [keepBtn, closeOtherBtn];

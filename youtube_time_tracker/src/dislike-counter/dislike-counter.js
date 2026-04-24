@@ -262,14 +262,19 @@ function tryRenderDislike() {
 }
 
 function forceVisibility(btn) {
+    // Only force the button element itself and its shadow host ancestors.
+    // Do NOT touch the internal content container (icon parent) — that has
+    // flex layout we manage separately and overwriting it breaks spacing.
     let curr = btn;
     for (let i = 0; i < 4; i++) {
         if (!curr || curr === document.body) break;
         if (curr.nodeType === 1) {
-            curr.style.setProperty("width", "auto", "important");
-            curr.style.setProperty("min-width", "unset", "important");
             curr.style.setProperty("overflow", "visible", "important");
-            curr.style.setProperty("display", "inline-flex", "important");
+            // Only set width/display on the outer wrapper (not inside shadow root)
+            if (!(curr.parentNode instanceof ShadowRoot)) {
+                curr.style.setProperty("width", "auto", "important");
+                curr.style.setProperty("min-width", "unset", "important");
+            }
         }
         
         if (curr.parentNode instanceof ShadowRoot) {
@@ -289,38 +294,80 @@ function doRender(data, videoId, btn) {
     if (!ariaLabel.includes("dislike") && !title.includes("dislike")) return;
 
     const countText = formatDislikeCount(data.dislikes);
-    let label = findTextSlot(btn);
+    const root = btn.shadowRoot || btn;
+    let label = root.querySelector(".ytt-hijacked-label");
 
     if (!label) {
         label = document.createElement("span");
-        label.className = "yt-core-attributed-string ytt-hijacked-label";
-        const root = btn.shadowRoot || btn;
-        const icon = root.querySelector("yt-icon, svg, .yt-spec-button-shape-next__icon");
-        if (icon) {
+        label.className = "ytt-hijacked-label";
+    }
+
+    const icon = root.querySelector("yt-icon, svg, .yt-spec-button-shape-next__icon");
+    const isShorts = window.location.pathname.includes("/shorts");
+
+    if (icon) {
+        // Always re-position: insert right after the icon
+        if (label.previousElementSibling !== icon) {
             icon.insertAdjacentElement("afterend", label);
-        } else {
-            root.appendChild(label);
         }
+
+        // Style the icon's parent as a flex container — run on EVERY render
+        const parent = icon.parentElement;
+        if (parent && parent.nodeType === 1) {
+            parent.style.setProperty("display", "flex", "important");
+            parent.style.setProperty("flex-direction", isShorts ? "column" : "row", "important");
+            parent.style.setProperty("align-items", "center", "important");
+            parent.style.setProperty("justify-content", "flex-start", "important");
+            parent.style.setProperty("flex-wrap", "nowrap", "important");
+            parent.style.setProperty("overflow", "visible", "important");
+            parent.style.removeProperty("gap"); // Let margins handle spacing exclusively
+        }
+
+        // Keep icon stable
+        icon.style.setProperty("flex-shrink", "0", "important");
+        icon.style.setProperty("display", "inline-flex", "important");
+        icon.style.setProperty("margin", "0", "important");
+    } else if (!label.parentElement) {
+        root.appendChild(label);
     }
 
     label.textContent = countText;
     label.classList.add("ytt-hijacked-label");
     btn.dataset.yttDislikeVideo = videoId;
 
-    label.style.cssText = `
-        display: inline-flex !important;
-        align-items: center !important;
-        margin-left: 6px !important;
-        vertical-align: middle !important;
-        line-height: 1 !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        font-family: inherit !important;
-        font-size: 14px !important;
-        font-weight: 500 !important;
-        color: inherit !important;
-        white-space: nowrap !important;
-    `;
+    // Apply spacing and appearance on EVERY render
+    label.style.cssText = isShorts
+        ? `
+            display: block !important;
+            margin-top: 4px !important;
+            margin-left: 0 !important;
+            font-family: "Roboto", Arial, sans-serif !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            color: inherit !important;
+            white-space: nowrap !important;
+            pointer-events: none !important;
+            flex-shrink: 0 !important;
+            line-height: 1 !important;
+          `
+        : `
+            display: inline-flex !important;
+            align-items: center !important;
+            margin-left: 12px !important;
+            margin-right: 0 !important;
+            margin-top: 0 !important;
+            vertical-align: middle !important;
+            line-height: normal !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            font-family: "Roboto", Arial, sans-serif !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            color: inherit !important;
+            white-space: nowrap !important;
+            pointer-events: none !important;
+            flex-shrink: 0 !important;
+          `;
 
     forceVisibility(btn);
     // console.log(`YTT: [Dislike] Rendered ${countText} for video ${videoId}`);
