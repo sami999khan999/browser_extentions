@@ -483,20 +483,39 @@
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
   right: 0;
+  width: 220px;
   background: rgba(24, 24, 24, 0.98);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--stats-border);
   border-radius: 12px;
   overflow-y: auto;
-  max-height: 220px;
+  max-height: 320px;
   z-index: 1000;
   display: none;
   flex-direction: column;
+  gap: 4px;
+  padding: 10px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   animation: dropdownFadeIn 0.2s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.dropdown-menu::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.dropdown-menu::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 10px !important;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--stats-primary) !important;
 }
 
 @keyframes dropdownFadeIn {
@@ -519,12 +538,16 @@
 }
 
 .dropdown-item {
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: 14px 18px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--stats-text-primary);
   cursor: pointer;
   transition: all 0.2s;
+  text-align: center;
+  display: block;
+  line-height: 1.4;
+  border-radius: 10px;
 }
 
 .dropdown-item:hover {

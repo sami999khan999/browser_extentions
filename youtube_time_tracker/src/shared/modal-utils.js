@@ -1,7 +1,8 @@
 /**
- * Global tracker for elements made inert by current modal
+ * Global stacks for elements made inert by modals and active key handlers
  */
-let isolatedElements = [];
+let isolationStack = [];
+let keyHandlerStack = [];
 let activeModalKeyHandler = null;
 
 /**
@@ -9,43 +10,46 @@ let activeModalKeyHandler = null;
  * 
  * @param {HTMLElement} modalOverlay - The modal overlay to keep active
  */
+/**
+ * isolateModal - Makes all background elements inert except the modal itself.
+ * 
+ * @param {HTMLElement} modalOverlay - The modal overlay to keep active
+ */
 function isolateModal(modalOverlay) {
-    isolatedElements = [];
+    const isolatedInThisStep = [];
     const siblings = Array.from(document.body.children);
+    
     siblings.forEach(sibling => {
+        // We only isolate elements that are NOT the current modal and NOT already inert
+        // This ensures nested modals don't try to double-isolate background
         if (sibling !== modalOverlay && !sibling.hasAttribute('inert')) {
             sibling.setAttribute('inert', '');
             sibling.setAttribute('aria-hidden', 'true');
-            isolatedElements.push(sibling);
+            isolatedInThisStep.push(sibling);
         }
     });
+    
+    isolationStack.push(isolatedInThisStep);
 
-    // Block all keyboard events from reaching YouTube background
+    // Save current handler if we're nesting
     if (activeModalKeyHandler) {
         removeModalListeners();
+        keyHandlerStack.push(activeModalKeyHandler);
     }
 
     activeModalKeyHandler = (e) => {
-        // Allow keys through when recording a keybind remap
         if (typeof isRecording !== 'undefined' && isRecording) return;
 
         const isInside = modalOverlay.contains(e.target);
         const isTab = e.key === 'Tab';
         const isEscape = e.key === 'Escape';
         const isActionOnButton = (e.key === ' ' || e.key === 'Enter') && isInside && e.target.tagName === 'BUTTON';
-
-        // We only allow:
-        // 1. Tab/Escape (standard modal navigation)
-        // 2. Any key if the focus is ALREADY inside the modal and it's not a forbidden global shortcut
-        // But to be safest, we block everything and only whitelist what's needed.
-        
         const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
         
         if (isTab || isEscape || isActionOnButton || isInput) {
-            return; // Normal modal or input behavior
+            return;
         }
 
-        // Block everything else
         e.stopImmediatePropagation();
         e.preventDefault();
     };
@@ -73,18 +77,27 @@ function removeModalListeners() {
 /**
  * restoreIsolation - Removes inert and aria-hidden from formerly isolated elements.
  */
+/**
+ * restoreIsolation - Removes inert and aria-hidden from formerly isolated elements.
+ */
 function restoreIsolation() {
-    isolatedElements.forEach(el => {
+    const elementsToRestore = isolationStack.pop() || [];
+    elementsToRestore.forEach(el => {
         if (el) {
             el.removeAttribute('inert');
             el.removeAttribute('aria-hidden');
         }
     });
-    isolatedElements = [];
 
     if (activeModalKeyHandler) {
         removeModalListeners();
-        activeModalKeyHandler = null;
+    }
+
+    // Restore previous handler
+    activeModalKeyHandler = keyHandlerStack.pop() || null;
+    
+    if (activeModalKeyHandler) {
+        addModalListeners();
     }
 }
 
@@ -132,8 +145,13 @@ function showConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
 
     const dismiss = () => {
         overlay.classList.remove('visible');
-        document.body.style.overflow = '';
-        document.body.style.userSelect = '';
+        
+        // Only clear global styles if this is the last modal or sidebar
+        if (isolationStack.length <= 1) {
+            document.body.style.overflow = '';
+            document.body.style.userSelect = '';
+        }
+        
         restoreIsolation();
         setTimeout(() => overlay.remove(), 300);
     };
@@ -219,7 +237,11 @@ function showAlertModal({ title, message, buttonText = 'Got it', icon = '⚠️'
     const okBtn = document.getElementById('modal-ok');
     const dismiss = () => {
         overlay.classList.remove('visible');
-        document.body.style.overflow = '';
+        
+        if (isolationStack.length <= 1) {
+            document.body.style.overflow = '';
+        }
+
         restoreIsolation();
         setTimeout(() => overlay.remove(), 300);
     };
@@ -418,7 +440,11 @@ function showMultiTabModal(otherTabId, onKeep) {
 
     const dismiss = () => {
         overlay.classList.remove('visible');
-        document.body.style.overflow = '';
+        
+        if (isolationStack.length <= 1) {
+            document.body.style.overflow = '';
+        }
+
         restoreIsolation();
         setTimeout(() => overlay.remove(), 400);
     };

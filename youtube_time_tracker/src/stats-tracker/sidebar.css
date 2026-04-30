@@ -150,17 +150,37 @@ body.yt-shorts-resizing-active {
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
   right: 0;
+  width: 220px;
   background: #1a1a1a;
   border: 1px solid var(--stats-border);
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   z-index: 1000;
   display: none;
-  overflow: hidden;
-  padding: 6px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
   animation: dropdownFade 0.2s cubic-bezier(0, 0, 0.2, 1);
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.dropdown-menu::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.dropdown-menu::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 10px !important;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--stats-primary) !important;
 }
 
 @keyframes dropdownFade {
@@ -179,16 +199,16 @@ body.yt-shorts-resizing-active {
 }
 
 .dropdown-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--stats-text-secondary);
   cursor: pointer;
   transition: all 0.15s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: center;
+  display: block;
+  line-height: 1.4;
 }
 
 .dropdown-item:hover {

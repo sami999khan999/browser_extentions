@@ -1403,6 +1403,7 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
       const ignoreIds = [
         "ytt-backup-reminder",
         "break-reminder-modal",
+        "stats-confirm-modal",
         "stats-multitab-toast",
         "stats-multitab-modal",
       ];

@@ -900,7 +900,7 @@
   height: 28px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--stats-border);
-  border-radius: 100px; /* Pill shape */
+  border-radius: 8px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
@@ -920,11 +920,11 @@
 }
 
 .heatmap-year-dropdown .dropdown-trigger span {
-  font-size: 10px; /* Slightly smaller */
+  font-size: 12px;
   font-weight: 800;
   color: var(--stats-text-secondary);
   letter-spacing: 0.2px;
-  white-space: nowrap; /* Prevent "Last 365 Days" from wrapping */
+  white-space: nowrap;
 }
 
 .heatmap-year-dropdown.open .dropdown-trigger span,
@@ -933,14 +933,19 @@
 }
 
 .heatmap-year-dropdown .dropdown-menu {
-  min-width: 120px;
+  width: 160px;
   right: 0;
   left: auto;
+  padding: 8px;
 }
 
 .heatmap-year-dropdown .dropdown-item {
-  font-size: 11px;
-  padding: 6px 12px;
+  font-size: 14px;
+  padding: 12px 16px;
+  text-align: center;
+  display: block;
+  line-height: 1.4;
+  border-radius: 10px;
 }
 
 .heatmap-legend {
@@ -955,7 +960,7 @@
   padding: 0 8px; /* Reduced */
   height: 28px; /* Match dropdown height */
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 100px; /* Pill shape */
+  border-radius: 8px;
   border: 1px solid var(--stats-border);
   box-sizing: border-box;
 }
