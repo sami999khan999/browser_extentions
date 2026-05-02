@@ -15,6 +15,8 @@ let breakSettings = {
 const activePlayingTabs = {}; // Tracks { tabId: timestamp }
 let backupSettings = {
   enabled: true,
+  intervalValue: 24,
+  intervalUnit: "hours",
   intervalHours: 24,
   backupOnClose: true,
   maxBackups: 10,
@@ -674,11 +676,28 @@ async function createBackup() {
     if (backupSettings.maxBackups) {
       await self.yttDB.purgeOldBackups(backupSettings.maxBackups);
     }
+
+    // Broadcast to all tabs that a new backup was created (so they can refresh list instantly)
+    broadcastBackupCreated();
+
     return data;
   } catch (e) {
     console.error("Background: Backup failed:", e);
     return null;
   }
+}
+
+function broadcastBackupCreated() {
+  tabs.query({ url: "*://*.youtube.com/*" }, (allTabs) => {
+    allTabs.forEach((tab) => {
+      if (!tab.url || !tab.url.includes("youtube.com")) return;
+      try {
+        chrome.tabs.sendMessage(tab.id, { action: "BACKUP_CREATED" }, () => {
+          if (chrome.runtime.lastError) { /* ignore */ }
+        });
+      } catch (e) {}
+    });
+  });
 }
 
 async function handleImportBackup(data) {
@@ -764,13 +783,28 @@ async function handleImportBackup(data) {
 function scheduleAlarms() {
   // 1. Periodic Storage Backup
   chrome.alarms.clear("ytt_periodic_backup", () => {
-    if (backupSettings.enabled && backupSettings.intervalHours > 0) {
-      chrome.alarms.create("ytt_periodic_backup", {
-        periodInMinutes: backupSettings.intervalHours * 60,
-      });
+    if (backupSettings.enabled) {
+      let intervalMinutes = 24 * 60; // Default
+      const val = backupSettings.intervalValue || 1;
+      const unit = backupSettings.intervalUnit || "hours";
+      
+      if (unit === "weeks") intervalMinutes = val * 7 * 24 * 60;
+      else if (unit === "days") intervalMinutes = val * 24 * 60;
+      else if (unit === "hours") intervalMinutes = val * 60;
+      else if (unit === "minutes") intervalMinutes = val;
+
+      console.log(`YTT: Attempting to schedule backup. Val: ${val}, Unit: ${unit}, Result: ${intervalMinutes} min`);
+
+      if (intervalMinutes > 0) {
+        chrome.alarms.create("ytt_periodic_backup", {
+          periodInMinutes: Math.max(1, intervalMinutes),
+        });
+        console.log(`YTT: Backup alarm created for every ${intervalMinutes} minutes.`);
+      }
+    } else {
+      console.log("YTT: Automatic backups are disabled.");
     }
   });
-
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {

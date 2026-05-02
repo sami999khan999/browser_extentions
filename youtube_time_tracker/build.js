@@ -22,6 +22,7 @@ const JS_FILES = [
     'shared/utils.js',
     'shared/modal-utils.js',
     'shared/db.js',
+    'shared/dropdown.js',
 
     // 2. Shorts Blocker domain
     'shorts-blocker/blocker.js',
@@ -84,6 +85,7 @@ const CSS_OUTPUT = path.join(DIST_DIR, 'content.css');
 const CSS_FILES = [
     'src/shared/theme.css',
     'src/shared/modal.css',
+    'src/shared/dropdown.css',
     'src/stats-tracker/toggle-button.css',
     'src/stats-tracker/sidebar.css',
     'src/stats-tracker/dashboard.css',

@@ -731,7 +731,7 @@ function renderActivityHeatmap() {
 
   if (selectorContainer) {
     selectorContainer.innerHTML = `
-            <div class="custom-dropdown heatmap-year-dropdown" id="heatmap-year-dropdown">
+            <div class="custom-dropdown heatmap-year-dropdown" id="heatmap-year-dropdown" data-value="${selectedHeatmapYear}">
                 <div class="dropdown-trigger">
                     <span>${selectedHeatmapYear}</span>
                     <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -752,23 +752,10 @@ function renderActivityHeatmap() {
 
     const dropdown = document.getElementById("heatmap-year-dropdown");
     if (dropdown) {
-      const trigger = dropdown.querySelector(".dropdown-trigger");
-      trigger.onclick = (e) => {
-        e.stopPropagation();
-        // Close other open dropdowns first
-        document.querySelectorAll(".custom-dropdown.open").forEach((d) => {
-          if (d !== dropdown) d.classList.remove("open");
-        });
-        dropdown.classList.toggle("open");
-      };
-
-      dropdown.querySelectorAll(".dropdown-item").forEach((item) => {
-        item.onclick = (e) => {
-          e.stopPropagation();
-          selectedHeatmapYear = item.dataset.value;
-          dropdown.classList.remove("open");
-          renderActivityHeatmap();
-        };
+      if (typeof initializeDropdowns === "function") initializeDropdowns();
+      dropdown.addEventListener("change", (e) => {
+        selectedHeatmapYear = e.detail.value;
+        renderActivityHeatmap();
       });
     }
   }

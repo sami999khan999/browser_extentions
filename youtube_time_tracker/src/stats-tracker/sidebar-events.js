@@ -81,6 +81,11 @@ function syncSettingsUI() {
     }
   }
 
+  const backupIntervalValue = document.getElementById("backup-interval-value");
+  if (backupIntervalValue && document.activeElement !== backupIntervalValue) {
+    backupIntervalValue.value = backupSettings.intervalValue || 24;
+  }
+
   // 3. Custom Dropdowns
   const syncDropdown = (id, value, map) => {
     const dropdown = document.getElementById(id);
@@ -93,7 +98,6 @@ function syncSettingsUI() {
         seconds: "sec",
         hours: "hr",
       };
-      // Prioritize explicit map > default labels > raw value
       triggerSpan.textContent = (map && map[value]) || defaultLabels[value] || value;
     }
 
@@ -106,12 +110,11 @@ function syncSettingsUI() {
     });
   };
 
-  syncDropdown("backup-interval-dropdown", backupSettings.intervalHours, {
-    1: "Every Hour",
-    6: "Every 6 Hours",
-    12: "Every 12 Hours",
-    24: "Every Day",
-    168: "Every Week",
+  syncDropdown("backup-interval-unit-dropdown", backupSettings.intervalUnit || "hours", {
+    weeks: "wks",
+    days: "days",
+    hours: "hr",
+    minutes: "min",
   });
 
   syncDropdown("reminder-interval-unit-dropdown", backupSettings.reminderUnit, {
@@ -140,10 +143,20 @@ function syncSettingsUI() {
     hours: "hr",
   });
 
-  // 4. Special internal UI syncs
+  if (typeof initializeDropdowns === "function") initializeDropdowns();
   if (typeof syncHistoryPresets === "function") syncHistoryPresets();
   if (typeof updateDateLabel === "function") updateDateLabel();
 }
+
+// Global message listener for live UI updates
+runtime.onMessage.addListener((request) => {
+  if (request.action === "BACKUP_CREATED") {
+    // Only refresh if we are currently looking at the backup view
+    if (activeView === "backup") {
+      renderBackups();
+    }
+  }
+});
 
 /**
  * Formats a date or preset label for the UI (e.g., "Apr 7, 2026", "Today", or "Last 30 Days").
@@ -500,26 +513,10 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
   // History Period Dropdown Logic
   const histDropdown = document.getElementById("history-period-dropdown");
   if (histDropdown) {
-    const trigger = histDropdown.querySelector(".dropdown-trigger");
-    const items = histDropdown.querySelectorAll(".dropdown-item");
-
-    trigger.onclick = (e) => {
-      e.stopPropagation();
-      const isOpen = histDropdown.classList.contains("open");
-      document.querySelectorAll(".custom-dropdown.open").forEach((d) => {
-        if (d !== histDropdown) d.classList.remove("open");
-      });
-      histDropdown.classList.toggle("open");
-    };
-
-    items.forEach((item) => {
-      item.onclick = (e) => {
-        e.stopPropagation();
-        selectedDayFilter = item.dataset.value;
-        histDropdown.classList.remove("open");
-        updateDateLabel();
-        renderStats();
-      };
+    histDropdown.addEventListener("change", (e) => {
+      selectedDayFilter = e.detail.value;
+      updateDateLabel();
+      renderStats();
     });
   }
 
@@ -699,36 +696,9 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
 
   const unitDropdown = document.getElementById("interval-unit-dropdown");
   if (unitDropdown) {
-    const trigger = unitDropdown.querySelector(".dropdown-trigger");
-    const items = unitDropdown.querySelectorAll(".dropdown-item");
-
-    trigger.onclick = (e) => {
-      e.stopPropagation();
-      const isOpen = unitDropdown.classList.contains("open");
-      document.querySelectorAll(".custom-dropdown.open").forEach((d) => {
-        if (d !== unitDropdown) d.classList.remove("open");
-      });
-      unitDropdown.classList.toggle("open");
-    };
-
-    items.forEach((item) => {
-      item.onclick = (e) => {
-        e.stopPropagation();
-        const value = item.dataset.value;
-        breakSettings.intervalUnit = value;
-        saveBreakSettings();
-
-        unitDropdown.dataset.value = value;
-        const displayLabel = {
-          minutes: "min",
-          seconds: "sec",
-          hours: "hr",
-        }[value];
-        trigger.querySelector("span").textContent = displayLabel || value;
-        items.forEach((i) => i.classList.remove("active"));
-        item.classList.add("active");
-        unitDropdown.classList.remove("open");
-      };
+    unitDropdown.addEventListener("change", (e) => {
+      breakSettings.intervalUnit = e.detail.value;
+      saveBreakSettings();
     });
   }
 
@@ -823,41 +793,42 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     };
   }
 
-  const backupDropdown = document.getElementById("backup-interval-dropdown");
-  if (backupDropdown) {
-    const trigger = backupDropdown.querySelector(".dropdown-trigger");
-    const menu = backupDropdown.querySelector(".dropdown-menu");
-    const items = backupDropdown.querySelectorAll(".dropdown-item");
+  const backupMinus = document.getElementById("backup-interval-minus");
+  const backupPlus = document.getElementById("backup-interval-plus");
+  const backupValue = document.getElementById("backup-interval-value");
 
-    trigger.onclick = (e) => {
+  if (backupMinus) {
+    backupMinus.onclick = (e) => {
       e.stopPropagation();
-      const isOpen = backupDropdown.classList.contains("open");
-      // Close any other open dropdowns first (if we had more)
-      document
-        .querySelectorAll(".custom-dropdown.open")
-        .forEach((d) => d.classList.remove("open"));
-      if (!isOpen) backupDropdown.classList.add("open");
+      backupSettings.intervalValue = Math.max(1, (backupSettings.intervalValue || 1) - 1);
+      if (backupValue) backupValue.value = backupSettings.intervalValue;
+      saveBackupSettings();
     };
+  }
+  if (backupPlus) {
+    backupPlus.onclick = (e) => {
+      e.stopPropagation();
+      backupSettings.intervalValue = (backupSettings.intervalValue || 1) + 1;
+      if (backupValue) backupValue.value = backupSettings.intervalValue;
+      saveBackupSettings();
+    };
+  }
+  if (backupValue) {
+    const updateBackupInterval = () => {
+      let val = parseInt(backupValue.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      backupSettings.intervalValue = val;
+      saveBackupSettings();
+    };
+    backupValue.onchange = updateBackupInterval;
+    backupValue.oninput = updateBackupInterval;
+  }
 
-    items.forEach((item) => {
-      item.onclick = (e) => {
-        e.stopPropagation();
-        const value = parseInt(item.dataset.value, 10);
-        const label = item.textContent;
-
-        // Update state
-        backupSettings.intervalHours = value;
-        saveBackupSettings();
-
-        // Update UI
-        backupDropdown.dataset.value = value;
-        trigger.querySelector("span").textContent = label;
-        items.forEach((i) => i.classList.remove("active"));
-        item.classList.add("active");
-
-        // Close
-        backupDropdown.classList.remove("open");
-      };
+  const backupUnitDropdown = document.getElementById("backup-interval-unit-dropdown");
+  if (backupUnitDropdown) {
+    backupUnitDropdown.addEventListener("change", (e) => {
+      backupSettings.intervalUnit = e.detail.value;
+      saveBackupSettings();
     });
   }
 
@@ -906,33 +877,9 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     "reminder-interval-unit-dropdown",
   );
   if (reminderUnitDropdown) {
-    const trigger = reminderUnitDropdown.querySelector(".dropdown-trigger");
-    const menu = reminderUnitDropdown.querySelector(".dropdown-menu");
-    const items = reminderUnitDropdown.querySelectorAll(".dropdown-item");
-
-    trigger.onclick = (e) => {
-      e.stopPropagation();
-      const isOpen = reminderUnitDropdown.classList.contains("open");
-      document
-        .querySelectorAll(".custom-dropdown.open")
-        .forEach((d) => d.classList.remove("open"));
-      if (!isOpen) reminderUnitDropdown.classList.add("open");
-    };
-
-    items.forEach((item) => {
-      item.onclick = (e) => {
-        e.stopPropagation();
-        const value = item.dataset.value;
-
-        backupSettings.reminderUnit = value;
-        saveBackupSettings();
-
-        reminderUnitDropdown.dataset.value = value;
-        trigger.querySelector("span").textContent = item.textContent;
-        items.forEach((i) => i.classList.remove("active"));
-        item.classList.add("active");
-        reminderUnitDropdown.classList.remove("open");
-      };
+    reminderUnitDropdown.addEventListener("change", (e) => {
+      backupSettings.reminderUnit = e.detail.value;
+      saveBackupSettings();
     });
   }
 
@@ -948,43 +895,13 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     "retention-duration-dropdown",
   );
   if (retentionDropdown) {
-    const trigger = retentionDropdown.querySelector(".dropdown-trigger");
-    const menu = retentionDropdown.querySelector(".dropdown-menu");
-    const items = retentionDropdown.querySelectorAll(".dropdown-item");
+    retentionDropdown.addEventListener("change", (e) => {
+      retentionSettings.duration = parseInt(e.detail.value, 10);
+      saveRetentionSettings();
 
-    trigger.onclick = (e) => {
-      e.stopPropagation();
-      const isOpen = retentionDropdown.classList.contains("open");
-      document
-        .querySelectorAll(".custom-dropdown.open")
-        .forEach((d) => d.classList.remove("open"));
-      if (!isOpen) retentionDropdown.classList.add("open");
-    };
-
-    items.forEach((item) => {
-      item.onclick = (e) => {
-        e.stopPropagation();
-        const value = parseInt(item.dataset.value, 10);
-        const label = item.textContent;
-
-        // Update state
-        retentionSettings.duration = value;
-        saveRetentionSettings();
-
-        // Update UI
-        retentionDropdown.dataset.value = value;
-        trigger.querySelector("span").textContent = label;
-        items.forEach((i) => i.classList.remove("active"));
-        item.classList.add("active");
-
-        // Sync history filters
-        if (typeof syncHistoryPresets === "function") {
-          syncHistoryPresets();
-        }
-
-        // Close
-        retentionDropdown.classList.remove("open");
-      };
+      if (typeof syncHistoryPresets === "function") {
+        syncHistoryPresets();
+      }
     });
   }
 
@@ -1033,15 +950,8 @@ function bindSidebarEvents(sidebar, btn, dragStatus) {
     maxBackupsValue.oninput = updateMaxBackups;
   }
 
-  // Close dropdowns on outside click
-  document.addEventListener("click", (e) => {
-    // If we click inside any custom-dropdown trigger, let its own handler manage it
-    if (e.target.closest(".dropdown-trigger")) return;
-
-    document
-      .querySelectorAll(".custom-dropdown.open")
-      .forEach((d) => d.classList.remove("open"));
-  });
+  // Dropdown initialization
+  if (typeof initializeDropdowns === "function") initializeDropdowns();
 
   const createBackupBtn = document.getElementById("create-manual-backup");
   const deleteBtn = document.getElementById("delete-all-backups");
@@ -1894,12 +1804,17 @@ window.triggerManualBackup = function() {
     safeSendMessage({ action: "CREATE_BACKUP_MANUAL" }, () => {
       createBackupBtn.disabled = false;
       createBackupBtn.innerHTML = originalHtml;
-      if (activeView === "backup") renderBackups();
+      // Delay slightly to ensure IndexedDB has committed the change
+      setTimeout(() => {
+        renderBackups();
+      }, 100);
     });
   } else {
     // If btn doesn't exist (not in DOM), just send message
     safeSendMessage({ action: "CREATE_BACKUP_MANUAL" }, () => {
-       if (activeView === "backup") renderBackups();
+       setTimeout(() => {
+         renderBackups();
+       }, 100);
     });
   }
 };

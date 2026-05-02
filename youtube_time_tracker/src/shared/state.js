@@ -23,6 +23,8 @@ let breakSettings = {
 let dislikeCountSettings = { enabled: true };
 let backupSettings = {
   enabled: true,
+  intervalValue: 24,
+  intervalUnit: "hours",
   intervalHours: 24,
   backupOnClose: true,
   maxBackups: 10,

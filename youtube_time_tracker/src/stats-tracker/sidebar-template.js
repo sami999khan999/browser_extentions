@@ -448,10 +448,10 @@ function getSidebarHTML() {
                                         <div class="dropdown-item ${backupSettings.reminderUnit === "seconds" ? "active" : ""}" data-value="seconds">sec</div>
                                     </div>
                                 </div>
+                                <button id="test-backup-reminder" class="small-action-btn secondary icon-only-mobile" title="Preview Reminder Popup">
+                                    ${icons.eye}
+                                </button>
                             </div>
-                            <button id="test-backup-reminder" class="small-action-btn secondary" style="margin-top: 12px; width: 100%; height: 36px; gap: 6px;">
-                                ${icons.eye} Preview Reminder Popup
-                            </button>
                         </div>
                         <div class="settings-item vertical">
                             <div class="settings-item-info">
@@ -461,26 +461,29 @@ function getSidebarHTML() {
                                 </div>
                                 <span class="settings-item-desc">How often to perform periodic backup</span>
                             </div>
-                            <div class="custom-dropdown" id="backup-interval-dropdown" data-value="${backupSettings.intervalHours}">
-                                <div class="dropdown-trigger">
-                                    <span>${
-                                      {
-                                        1: "Every Hour",
-                                        6: "Every 6 Hours",
-                                        12: "Every 12 Hours",
-                                        24: "Every Day",
-                                        168: "Every Week",
-                                      }[backupSettings.intervalHours] ||
-                                      "Every Day"
-                                    }</span>
-                                    <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            <div class="settings-input-group side-by-side">
+                                <div class="interval-input-wrapper">
+                                    <button class="interval-btn minus" id="backup-interval-minus">−</button>
+                                    <input type="number" id="backup-interval-value" class="interval-value" value="${backupSettings.intervalValue || 24}" min="1" style="width: 100%;">
+                                    <button class="interval-btn plus" id="backup-interval-plus">+</button>
                                 </div>
-                                <div class="dropdown-menu">
-                                    <div class="dropdown-item ${backupSettings.intervalHours == 1 ? "active" : ""}" data-value="1">Every Hour</div>
-                                    <div class="dropdown-item ${backupSettings.intervalHours == 6 ? "active" : ""}" data-value="6">Every 6 Hours</div>
-                                    <div class="dropdown-item ${backupSettings.intervalHours == 12 ? "active" : ""}" data-value="12">Every 12 Hours</div>
-                                    <div class="dropdown-item ${backupSettings.intervalHours == 24 ? "active" : ""}" data-value="24">Every Day</div>
-                                    <div class="dropdown-item ${backupSettings.intervalHours == 168 ? "active" : ""}" data-value="168">Every Week</div>
+                                <div class="custom-dropdown tiny" id="backup-interval-unit-dropdown" data-value="${backupSettings.intervalUnit || 'hours'}">
+                                    <div class="dropdown-trigger">
+                                        <span>${
+                                            backupSettings.intervalUnit === "weeks" 
+                                                ? "wks" 
+                                                : (backupSettings.intervalUnit === "days" 
+                                                    ? "days" 
+                                                    : (backupSettings.intervalUnit === "hours" ? "hr" : "min"))
+                                        }</span>
+                                        <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                    </div>
+                                    <div class="dropdown-menu">
+                                        <div class="dropdown-item ${backupSettings.intervalUnit === "weeks" ? "active" : ""}" data-value="weeks">wks</div>
+                                        <div class="dropdown-item ${backupSettings.intervalUnit === "days" ? "active" : ""}" data-value="days">days</div>
+                                        <div class="dropdown-item ${backupSettings.intervalUnit === "hours" ? "active" : ""}" data-value="hours">hr</div>
+                                        <div class="dropdown-item ${backupSettings.intervalUnit === "minutes" ? "active" : ""}" data-value="minutes">min</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
